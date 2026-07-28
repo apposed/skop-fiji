@@ -29,8 +29,11 @@
 package org.apposed.skop.fiji;
 
 import net.imagej.Dataset;
+import net.imagej.roi.ROITree;
+import net.imglib2.roi.labeling.ImgLabeling;
 
 import org.apposed.skop.fiji.wire.Role;
+import org.scijava.table.Table;
 
 /**
  * What each of skop's semantic roles becomes in Fiji.
@@ -45,35 +48,40 @@ import org.apposed.skop.fiji.wire.Role;
  * An op that returns a bare unannotated array has told this side nothing, and
  * this side has to display it anyway. Every front end will want to guess, and
  * every front end should -- differently, in its own module, where its own
- * display model justifies it. That module is this one.
- * <p>
- * Where this is going, and where it is:
+ * display model justifies it. That module is this one, and its guess is
+ * "an array with no role is a picture", which is right far more often than
+ * not.
  *
  * <table>
  *   <caption>Roles in Fiji</caption>
- *   <tr><th>Role</th><th>Eventually</th><th>Today</th></tr>
- *   <tr><td>{@code image}</td><td>{@code Dataset}</td><td>{@code Dataset}</td></tr>
- *   <tr><td>{@code labels}</td><td>{@code ImgLabeling}</td><td>{@code Dataset}</td></tr>
- *   <tr><td>{@code masks}</td><td>ROI Manager / {@code Overlay}</td><td>{@code Dataset}</td></tr>
- *   <tr><td>{@code points}</td><td>{@code PointRoi}</td><td>{@code Dataset}</td></tr>
- *   <tr><td>{@code shapes}</td><td>{@code Overlay} of rectangles</td><td>{@code Dataset}</td></tr>
- *   <tr><td>{@code vectors}</td><td>{@code Overlay} of arrows</td><td>{@code Dataset}</td></tr>
- *   <tr><td>{@code tracks}</td><td>{@code Table}, then TrackMate</td><td>{@code Dataset}</td></tr>
- *   <tr><td>{@code surface}</td><td>imagej-mesh</td><td>{@code Dataset}</td></tr>
- *   <tr><td>none</td><td>a row in a {@code Table}</td><td>{@code Dataset}</td></tr>
+ *   <tr><th>Role</th><th>Type</th><th></th></tr>
+ *   <tr><td>{@code image}</td><td>{@link Dataset}</td><td></td></tr>
+ *   <tr><td>{@code labels}</td><td>{@link ImgLabeling}</td><td></td></tr>
+ *   <tr><td>{@code masks}</td><td>{@link ROITree}</td><td>one ROI per mask, overlapping allowed</td></tr>
+ *   <tr><td>{@code points}</td><td>{@link ROITree}</td><td>of point masks</td></tr>
+ *   <tr><td>{@code shapes}</td><td>{@link ROITree}</td><td>of boxes</td></tr>
+ *   <tr><td>{@code tracks}</td><td>{@link Table}</td><td>a TrackMate model later</td></tr>
+ *   <tr><td>{@code vectors}</td><td>{@link Dataset}</td><td>still owed an Overlay of arrows</td></tr>
+ *   <tr><td>{@code surface}</td><td>{@link Dataset}</td><td>still owed a mesh</td></tr>
+ *   <tr><td>none</td><td>{@link Dataset}</td><td></td></tr>
  * </table>
  *
- * Every array is a {@code Dataset} for now, in and out. That is deliberately
- * the crude answer: a set of coordinates rendered as an N&times;3 image is not
- * useful, but it is <em>lossless</em>, which a dropped output is not. The
- * specialized types arrive with the roles in the next phase, and
- * {@link #specialized(Role)} is what says which ones are still waiting.
- * <p>
- * {@code labels} will be an {@code ImgLabeling} rather than a glasbey-LUT
- * {@code Dataset}, because that is what a label image <em>is</em>. A LUT'd
+ * {@code labels} is an {@code ImgLabeling} rather than a glasbey-LUT
+ * {@code Dataset} because that is what a label image <em>is</em>. A LUT'd
  * Dataset is a rendering of one, and picking the rendering as the
  * representation would throw away the structure every downstream ImgLib2
- * consumer wants.
+ * consumer wants. Conversions between labelings and images are useful in
+ * their own right and belong in {@code skop.ops.labels}, not here.
+ * <p>
+ * {@code masks} is the role that comes out <em>better</em> here than in
+ * napari. A napari Labels layer cannot show overlapping objects, so
+ * {@code skop.masks} has to project them first; Fiji's ROI Manager holds
+ * overlapping ROIs natively, so the projection becomes one of several things
+ * a user may ask for rather than a precondition for seeing anything at all.
+ * <p>
+ * The two roles still falling back to {@code Dataset} have no op producing
+ * them, which is why they are last in the queue rather than a gap in it.
+ * {@link #owed(Role)} is what says so out loud.
  *
  * @author Curtis Rueden
  */
@@ -87,42 +95,47 @@ public final class Roles {
 	 * The Java type a value of this role is harvested and displayed as.
 	 *
 	 * @param role the role, or null for a value skop said nothing about.
-	 * @return the type; {@link Dataset} throughout, for now.
+	 * @return the type.
 	 */
 	public static Class<?> type(Role role) {
-		return Dataset.class;
+		if (role == null) return Dataset.class;
+		switch (role) {
+			case LABELS:
+				return ImgLabeling.class;
+			case MASKS:
+			case POINTS:
+			case SHAPES:
+				return ROITree.class;
+			case TRACKS:
+				return Table.class;
+			case IMAGE:
+			case VECTORS:
+			case SURFACE:
+			default:
+				return Dataset.class;
+		}
+	}
+
+	/** Whether values of this role become ROIs. */
+	public static boolean isRoi(Role role) {
+		return role == Role.MASKS || role == Role.POINTS || role == Role.SHAPES;
 	}
 
 	/**
-	 * Whether this role still wants a type of its own that it does not have.
+	 * What a value of this role is still owed, or null if it has what it needs.
 	 * <p>
-	 * True means the value survives as a {@code Dataset} but is not yet shown
-	 * as the thing it is -- worth saying out loud in a log, and worth nothing
-	 * more than that. An op is perfectly runnable in the meantime.
+	 * A value falling back to a {@code Dataset} still survives -- an
+	 * N&times;3&times;2 array of arrows shown as an image is useless but
+	 * lossless, and a dropped output is neither. Worth one line in the log so
+	 * that nobody has to guess whether it was meant to look like that.
 	 *
 	 * @param role the role, or null.
-	 * @return whether a better representation is still owed.
+	 * @return the representation still owed, or null.
 	 */
-	public static boolean specialized(Role role) {
-		return role != null && role != Role.IMAGE;
-	}
-
-	/**
-	 * What a value of this role will eventually be shown as, for a message
-	 * that explains why it is not yet.
-	 *
-	 * @param role the role, or null.
-	 * @return the eventual representation's name, or null if none is owed.
-	 */
-	public static String eventualType(Role role) {
+	public static String owed(Role role) {
 		if (role == null) return null;
 		switch (role) {
-			case LABELS: return "ImgLabeling";
-			case MASKS: return "the ROI Manager";
-			case POINTS: return "PointRoi";
-			case SHAPES: return "an Overlay of rectangles";
 			case VECTORS: return "an Overlay of arrows";
-			case TRACKS: return "a Table";
 			case SURFACE: return "a mesh";
 			default: return null;
 		}

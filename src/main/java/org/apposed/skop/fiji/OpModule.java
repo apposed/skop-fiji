@@ -35,8 +35,8 @@ import java.util.Map;
 
 import net.imagej.Dataset;
 import net.imagej.DatasetService;
-import net.imglib2.type.NativeType;
-import net.imglib2.type.numeric.RealType;
+import net.imagej.roi.ROITree;
+import net.imglib2.roi.labeling.ImgLabeling;
 
 import org.apposed.appose.NDArray;
 import org.apposed.appose.Service;
@@ -125,7 +125,7 @@ public class OpModule extends AbstractModule implements Cancelable {
 			Map<String, Object> outputs = skop.runner().run(op, args, plans, null,
 				this::report, started -> task = started);
 
-			decode(op, outputs, plans);
+			decode(op, outputs, outputAxes(plans, axes));
 		}
 		catch (InterruptedException exc) {
 			Thread.currentThread().interrupt();
@@ -211,9 +211,25 @@ public class OpModule extends AbstractModule implements Cancelable {
 				NDArray array = Images.toNDArray(dataset.getImgPlus());
 				if (!Images.isShared(dataset.getImgPlus())) allocated.add(array);
 				args.put(param.name(), array);
-				if (param.axes() != null) {
-					axes.put(param.name(), Axes.numpyLabelsOf(dataset));
-				}
+				// Recorded for every image, not only the ones with declared
+				// axes: an op that adapts nothing still hands back a result
+				// whose axes are worth naming. See outputAxes.
+				axes.put(param.name(), Axes.numpyLabelsOf(dataset));
+			}
+			else if (value instanceof ImgLabeling) {
+				// A labeling that came back from an op is already the block the
+				// worker wrote, so chaining a segmentation costs nothing.
+				ImgLabeling<?, ?> labeling = (ImgLabeling<?, ?>) value;
+				NDArray array = Labelings.toNDArray(labeling);
+				if (!Labelings.isShared(labeling)) allocated.add(array);
+				args.put(param.name(), array);
+			}
+			else if (value instanceof ROITree) {
+				// Every op taking ROIs today takes boxes; a ROI that is not one
+				// contributes its bounds, which is what "boxes" means anyway.
+				NDArray array = Rois.toBoxArray(Rois.flatten((ROITree) value));
+				allocated.add(array);
+				args.put(param.name(), array);
 			}
 			else {
 				args.put(param.name(), value);
@@ -247,6 +263,10 @@ public class OpModule extends AbstractModule implements Cancelable {
 
 		int iterating = 0;
 		for (Map.Entry<String, List<String>> entry : axes.entrySet()) {
+			ParamSpec param = op.param(entry.getKey());
+			// Only a parameter that declared what it consumes can be fitted to
+			// anything; the rest are passed through as they are.
+			if (param == null || param.axes() == null) continue;
 			NDArray array = (NDArray) args.get(entry.getKey());
 			AdaptationPlan plan = skop.runner().plan(op.name(), entry.getKey(),
 				Axes.numpyShape(array), entry.getValue());
@@ -271,25 +291,39 @@ public class OpModule extends AbstractModule implements Cancelable {
 		return plans;
 	}
 
+	/**
+	 * What to call the axes of a result, or null to leave them unnamed.
+	 * <p>
+	 * A plan knows, because it worked out where every axis went. Without one,
+	 * the only defensible answer is the input's own labels, and only when
+	 * there was exactly one image to take them from -- an op given two arrays
+	 * gives no clue which the result resembles, and
+	 * {@link Images#toImgPlus} drops the names anyway if the count is wrong.
+	 * Naming an axis incorrectly is worse than leaving it unnamed, so this
+	 * declines wherever it would be guessing.
+	 */
+	private static List<String> outputAxes(Map<String, AdaptationPlan> plans,
+		Map<String, List<String>> axes)
+	{
+		if (plans.size() == 1) return plans.values().iterator().next().outputAxes();
+		if (plans.isEmpty() && axes.size() == 1) {
+			return axes.values().iterator().next();
+		}
+		return null;
+	}
+
 	/** Turns a worker's results into things Fiji can show. */
 	private void decode(OpSpec op, Map<String, Object> outputs,
-		Map<String, AdaptationPlan> plans)
+		List<String> outputAxes)
 	{
-		List<String> outputAxes = plans.size() == 1
-			? plans.values().iterator().next().outputAxes() : null;
-
 		for (OutputSpec output : op.outputSpecs()) {
 			Object value = outputs.get(output.name());
 			if (value instanceof NDArray) {
-				NDArray array = (NDArray) value;
-				Images.adopt(array);
-				setOutput(output.name(), Images.<DoubleLike>toDataset(datasets,
-					array, name(op, output), outputAxes));
-				if (Roles.specialized(output.role())) {
-					log.info(op.name() + ": '" + output.name() + "' is " +
-						output.role().wireName() + ", which will become " +
-						Roles.eventualType(output.role()) + "; for now it is an image.");
-				}
+				// The block outlives this call: whoever takes the result owns
+				// it. See Images.adopt.
+				Images.adopt((NDArray) value);
+				setOutput(output.name(), Results.convert(datasets, value, output,
+					name(op, output), outputAxes, log));
 			}
 			else if (value != null &&
 				Params.outputType(output) == String.class &&
@@ -334,16 +368,4 @@ public class OpModule extends AbstractModule implements Cancelable {
 		return String.join(", ", parts);
 	}
 
-	/**
-	 * The type bound {@link Images#toDataset} needs, named once.
-	 * <p>
-	 * The pixel type of a result is not known until the result arrives, so
-	 * every call site would otherwise carry the same unreadable pair of bounds
-	 * for a type argument that is inferred anyway.
-	 */
-	private interface DoubleLike
-		extends NativeType<DoubleLike>, RealType<DoubleLike>
-	{
-		// Marker only; never instantiated.
-	}
 }

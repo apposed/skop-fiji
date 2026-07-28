@@ -118,6 +118,18 @@
 			<artifactId>imglib2</artifactId>
 		</dependency>
 
+		<!-- ROIs: boxes, points, and the masks a segmentation found. -->
+		<dependency>
+			<groupId>net.imglib2</groupId>
+			<artifactId>imglib2-roi</artifactId>
+		</dependency>
+
+		<!-- Tables: where a measurement with no role goes. -->
+		<dependency>
+			<groupId>org.scijava</groupId>
+			<artifactId>scijava-table</artifactId>
+		</dependency>
+
 		<!-- ShmImg: an Img whose pixels are the shared memory a worker reads. -->
 		<dependency>
 			<groupId>net.imglib2</groupId>

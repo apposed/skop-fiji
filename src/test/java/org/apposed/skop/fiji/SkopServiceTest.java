@@ -42,7 +42,10 @@ import net.imagej.Dataset;
 import net.imagej.DatasetService;
 import net.imagej.axis.Axes;
 import net.imagej.axis.AxisType;
+import net.imagej.roi.ROITree;
 import net.imglib2.Cursor;
+import net.imglib2.roi.labeling.ImgLabeling;
+import net.imglib2.roi.labeling.LabelRegions;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.FloatType;
 
@@ -175,17 +178,19 @@ public class SkopServiceTest {
 		Module module = run("skop.ops.threshold:otsu", "image", image,
 			"label_objects", false);
 
+		// otsu is annotated LabelsData, so it comes back as a labeling even
+		// with label_objects off -- a 0/1 mask is still a label image.
 		Object result = module.getOutput("result");
-		assertTrue(result instanceof Dataset, "expected a Dataset, got " + result);
-		Dataset mask = (Dataset) result;
-		assertEquals(32, mask.dimension(0));
-		assertEquals(32, mask.dimension(1));
+		assertTrue(result instanceof ImgLabeling, "expected a labeling, got " + result);
 
-		int foreground = 0;
-		Cursor<RealType<?>> out = mask.cursor();
-		while (out.hasNext()) {
-			if (out.next().getRealDouble() > 0) foreground++;
-		}
+		@SuppressWarnings("unchecked")
+		ImgLabeling<String, ?> labeling = (ImgLabeling<String, ?>) result;
+		assertEquals(32, labeling.dimension(0));
+		assertEquals(32, labeling.dimension(1));
+
+		LabelRegions<String> regions = new LabelRegions<>(labeling);
+		assertEquals(1, regions.getExistingLabels().size(), "one foreground label");
+		long foreground = regions.getLabelRegion("1").size();
 		assertTrue(foreground > 0 && foreground < 1024,
 			"threshold kept " + foreground + " of 1024 pixels");
 	}
@@ -213,20 +218,17 @@ public class SkopServiceTest {
 
 		Module module = run("skop.ops.toy:quadrants", "image", stack);
 
-		Dataset labels = (Dataset) module.getOutput("result");
+		@SuppressWarnings("unchecked")
+		ImgLabeling<String, ?> labels =
+			(ImgLabeling<String, ?>) module.getOutput("result");
 		assertEquals(8, labels.dimension(0));
 		assertEquals(8, labels.dimension(1));
 		assertEquals(3, labels.dimension(2));
 
-		double highest = 0;
-		Cursor<RealType<?>> cursor = labels.cursor();
-		while (cursor.hasNext()) {
-			highest = Math.max(highest, cursor.next().getRealDouble());
-		}
 		// Four quadrants per plane, renumbered across three planes. If the
 		// axis order were reversed, this would be 8 planes of an 8x3 image and
-		// the answer would be 32 -- and nothing else would have complained.
-		assertEquals(12.0, highest, 0);
+		// there would be 32 -- and nothing else would have complained.
+		assertEquals(12, new LabelRegions<>(labels).getExistingLabels().size());
 	}
 
 	@Test
@@ -234,12 +236,15 @@ public class SkopServiceTest {
 		Dataset stack = image("stack", new long[] { 8, 8, 3 },
 			new AxisType[] { Axes.X, Axes.Y, Axes.Z }, 1);
 
-		Module module = run("skop.ops.toy:quadrants", "image", stack);
-		Dataset labels = (Dataset) module.getOutput("result");
+		// Axis names ride on a Dataset, so this asks an op that returns one.
+		// scale declares no Axes at all, so there is no plan to read them off:
+		// they come from the input, which is the only image in the room.
+		Module module = run("skop.ops.toy:scale", "image", stack, "factor", 1.0);
+		Dataset out = (Dataset) module.getOutput("scaled");
 
-		assertEquals(Axes.X, labels.axis(0).type());
-		assertEquals(Axes.Y, labels.axis(1).type());
-		assertEquals(Axes.Z, labels.axis(2).type());
+		assertEquals(Axes.X, out.axis(0).type());
+		assertEquals(Axes.Y, out.axis(1).type());
+		assertEquals(Axes.Z, out.axis(2).type());
 	}
 
 	@Test
@@ -250,9 +255,77 @@ public class SkopServiceTest {
 		Dataset stack = image("multichannel", new long[] { 8, 8, 2 },
 			new AxisType[] { Axes.X, Axes.Y, Axes.CHANNEL }, 1);
 
+		Module module = run("skop.ops.toy:scale", "image", stack, "factor", 1.0);
+		Dataset out = (Dataset) module.getOutput("scaled");
+		assertEquals(Axes.CHANNEL, out.axis(2).type());
+	}
+
+	// -- the roles ----------------------------------------------------------
+
+	@Test
+	public void testALabelsOutputIsALabeling() throws Exception {
+		Dataset stack = image("stack", new long[] { 8, 8 },
+			new AxisType[] { Axes.X, Axes.Y }, 1);
+
 		Module module = run("skop.ops.toy:quadrants", "image", stack);
-		Dataset labels = (Dataset) module.getOutput("result");
-		assertEquals(Axes.CHANNEL, labels.axis(2).type());
+
+		Object result = module.getOutput("result");
+		assertTrue(result instanceof ImgLabeling,
+			"a segmentation is a labeling, not a picture: " + result);
+
+		@SuppressWarnings("unchecked")
+		ImgLabeling<String, ?> labeling = (ImgLabeling<String, ?>) result;
+		LabelRegions<String> regions = new LabelRegions<>(labeling);
+		assertEquals(4, regions.getExistingLabels().size(), "four quadrants");
+		assertEquals(16, regions.getLabelRegion("1").size(), "8x8, quartered");
+	}
+
+	@Test
+	public void testAPointsOutputIsRois() throws Exception {
+		Dataset image = image("empty", new long[] { 4, 4 },
+			new AxisType[] { Axes.X, Axes.Y }, 0);
+
+		Module module = run("skop.ops.toy:find_nothing", "image", image);
+
+		// find_nothing returns a labeling and an empty set of points. An empty
+		// detection is an ordinary result, not a failure.
+		assertTrue(module.getOutput("labels") instanceof ImgLabeling);
+		Object points = module.getOutput("points");
+		assertTrue(points instanceof ROITree, "expected ROIs, got " + points);
+		assertTrue(Rois.flatten((ROITree) points).isEmpty());
+	}
+
+	@Test
+	public void testALabelingGoesBackToAnOpWithoutACopy() throws Exception {
+		// The chaining case, and the reason labels is an ImgLabeling at all: a
+		// segmentation feeds the next op straight out of the block the worker
+		// wrote it into.
+		Dataset stack = image("stack", new long[] { 8, 8, 2 },
+			new AxisType[] { Axes.X, Axes.Y, Axes.Z }, 1);
+		Module first = run("skop.ops.toy:quadrants", "image", stack);
+
+		@SuppressWarnings("unchecked")
+		ImgLabeling<String, ?> labeling =
+			(ImgLabeling<String, ?>) first.getOutput("result");
+		assertTrue(Labelings.isShared(labeling),
+			"a result should still be in the shared block the worker wrote");
+
+		Module second = run("skop.ops.labels:connect", "labels", labeling);
+		assertNotNull(second.getOutput("result"));
+	}
+
+	@Test
+	public void testAnImageThatCameBackGoesOutAgainWithoutACopy() throws Exception {
+		// The same claim for plain images, which is what P2 asserted and never
+		// checked: a Dataset wrapping a worker's block must be recognized as
+		// shared, or every chained op silently pays for two copies.
+		Dataset image = image("flat", new long[] { 4, 4 },
+			new AxisType[] { Axes.X, Axes.Y }, 2);
+		Module module = run("skop.ops.toy:scale", "image", image, "factor", 2.0);
+
+		Dataset scaled = (Dataset) module.getOutput("scaled");
+		assertTrue(Images.isShared(scaled.getImgPlus()),
+			"a result Dataset should be recognized as already shared");
 	}
 
 	// -- errors and cancellation --------------------------------------------
@@ -268,7 +341,9 @@ public class SkopServiceTest {
 			new AxisType[] { Axes.unknown(), Axes.unknown(), Axes.unknown() }, 1);
 
 		Module module = run("skop.ops.toy:quadrants", "image", stack);
-		Dataset labels = (Dataset) module.getOutput("result");
+		@SuppressWarnings("unchecked")
+		ImgLabeling<String, ?> labels =
+			(ImgLabeling<String, ?>) module.getOutput("result");
 
 		assertFalse(((OpModule) module).isCanceled());
 		assertEquals(8, labels.dimension(0));

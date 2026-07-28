@@ -10,23 +10,28 @@ for what that means and why it is shaped this way.
 
 ## Where this is
 
-**Phase 2 of five: one command per op, images in and out.** Every op skop can
-find is registered as its own SciJava module at startup, with a generated
-dialog, a menu entry, a search-bar hit and a recordable identifier. Images go
-in and come out as `Dataset`s, progress reaches the status bar, Cancel reaches
-the worker, and a failure reaches the log with its Python traceback intact.
+**Phase 3 of five: every role, as the thing it means.** Every op skop can find
+is registered as its own SciJava module at startup, with a generated dialog, a
+menu entry, a search-bar hit and a recordable identifier. A segmentation comes
+back as an `ImgLabeling`, detections as ROIs, tracks as a table; progress
+reaches the status bar, Cancel reaches the worker, and a failure reaches the
+log with its Python traceback intact.
 
 | | | |
 | --- | --- | --- |
 | P0 | in scikit-ops: `OpSpec` as JSON, `describe`/`plan` tasks, a pinned skop in each environment | done |
 | P1 | `SkopRunner`, and a headless test running `toy:add` and `threshold:otsu` on a `ShmImg` from Java | done |
 | P2 | dynamic module registration, image in and image out, progress, cancel, errors | done |
-| P3 | the rest of the roles: `ImgLabeling`, ROIs, tables, masks in the ROI Manager | next |
-| P4 | axis-mapping UI, environment manager, update site, macro-recording polish | |
+| P3 | the rest of the roles: `ImgLabeling`, ROIs, tables, masks in the ROI Manager | done |
+| P4 | axis-mapping UI, environment manager, update site, macro-recording polish | next |
 
-Every array is a `Dataset` for now, in and out -- a set of coordinates
-rendered as an N&times;3 image is not useful, but it is lossless, which a
-dropped output is not. `Roles` is where that gets better.
+| Role | Becomes |
+| --- | --- |
+| `image`, none | `Dataset` |
+| `labels` | `ImgLabeling` |
+| `masks`, `points`, `shapes` | `ROITree` (imagej-legacy takes it from there to the ROI Manager) |
+| `tracks` | `Table` |
+| `vectors`, `surface` | `Dataset`, for now -- no op produces either yet |
 
 ## What is here
 
@@ -37,6 +42,10 @@ OpModule.java       one run: encode, dispatch, decode; progress, cancel, errors
 Params.java         ParamSpec -> MutableModuleItem
 Roles.java          Role -> Fiji type; the only Fiji-specific lookup table
 Images.java         Dataset <-> NDArray, without a copy where there needn't be one
+Results.java        one output -> the Fiji thing its role means
+Labelings.java      label array <-> ImgLabeling, over the worker's own block
+Rois.java           boxes, points and masks <-> ROIs; coordinates reverse here too
+Tables.java         an (N, C) array -> a Table
 Docs.java           a Google-style docstring -> the text a dialog shows
 Axes.java           ImgLib2 axis labels -> skop's; the order flip lives here
 SkopRunner.java     a port of skop's runner.py: build, one service per environment, invoke
@@ -68,8 +77,8 @@ is what makes the boundary testable without a running Fiji.
 
 - No axis-mapping UI. skop's default plan is accepted as-is, which is the
   documented fallback and never loses data -- but it is the fallback.
-- Labels are shown as images rather than as `ImgLabeling`s; ROIs, tables and
-  the ROI Manager are not wired up. That is the next phase.
+- `vectors` and `surface` still fall back to `Dataset` -- lossless, but not
+  an Overlay of arrows or a mesh. No op produces either yet.
 - A result's shared memory is deliberately never released. See
   `Images.adopt`.
 

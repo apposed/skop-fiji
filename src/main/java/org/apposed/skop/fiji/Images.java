@@ -42,6 +42,7 @@ import net.imglib2.type.NativeType;
 import net.imglib2.type.numeric.RealType;
 
 import org.apposed.appose.NDArray;
+import org.apposed.appose.SharedMemory;
 
 /**
  * Images across the boundary, in both directions.
@@ -106,17 +107,47 @@ public final class Images {
 	 * innermost thing knows whether it is shared memory. Without this, every
 	 * image would be copied, including one that had just come back from a
 	 * worker.
+	 * <p>
+	 * <strong>The order of the two tests below matters.</strong> A
+	 * {@code ShmImg} is <em>both</em> a {@link WrappedNDArray} and a
+	 * {@code WrappedImg} around an ordinary {@code ArrayImg}, so unwrapping
+	 * first walks straight past the shared memory and reports there is none --
+	 * and every image gets copied, including the ones that never needed to be.
+	 * Nothing fails when that happens; it is merely twice the memory and twice
+	 * the traffic, forever.
 	 */
 	private static RandomAccessibleInterval<?> unwrap(
 		RandomAccessibleInterval<?> image)
 	{
 		RandomAccessibleInterval<?> current = image;
-		while (current instanceof net.imglib2.img.WrappedImg) {
+		while (true) {
+			if (current instanceof WrappedNDArray) return current;
+			if (!(current instanceof net.imglib2.img.WrappedImg)) return current;
 			Img<?> wrapped = ((net.imglib2.img.WrappedImg<?>) current).getImg();
-			if (wrapped == null || wrapped == current) break;
+			if (wrapped == null || wrapped == current) return current;
 			current = wrapped;
 		}
-		return current;
+	}
+
+	/**
+	 * Allocates shared memory for an array of the given numpy-order shape.
+	 * <p>
+	 * Handles the empty case, which is ordinary rather than exceptional: a
+	 * detector that finds nothing returns a {@code (0, 4)} array of boxes, and
+	 * a shared memory block must have a positive size. The shape and dtype
+	 * travel over a token block that nothing ever reads -- which is exactly
+	 * what skop's own codec does on the Python side.
+	 *
+	 * @param dType the element type.
+	 * @param numpyShape the shape, last axis fastest.
+	 * @return the array.
+	 */
+	public static NDArray allocate(NDArray.DType dType, int... numpyShape) {
+		NDArray.Shape shape =
+			new NDArray.Shape(NDArray.Shape.Order.C_ORDER, numpyShape);
+		return shape.numElements() == 0
+			? new NDArray(dType, shape, SharedMemory.create(1))
+			: new NDArray(dType, shape);
 	}
 
 	/**
