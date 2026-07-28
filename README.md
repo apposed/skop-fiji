@@ -60,6 +60,9 @@ is what makes the boundary testable without a running Fiji.
   a stack without anyone being asked anything. skop's default plan never
   discards data; its warnings go to the log.
 - **A stable macro identifier**, `skop:skop.ops.threshold:otsu`.
+- **Failures that say what happened.** A worker's traceback reaches the log
+  whole. A script can tell a failure from a user-pressed Cancel with
+  `OpModule.failure()`, which SciJava's `Cancelable` alone cannot.
 
 ## What it does not do yet
 

@@ -81,6 +81,7 @@ public class OpModule extends AbstractModule implements Cancelable {
 
 	private volatile Service.Task task;
 	private volatile String cancelReason;
+	private volatile Exception failure;
 
 	public OpModule(OpModuleInfo info) {
 		this.info = info;
@@ -101,6 +102,7 @@ public class OpModule extends AbstractModule implements Cancelable {
 	public void run() {
 		OpSpec op = info.op();
 		cancelReason = null;
+		failure = null;
 
 		List<ParamSpec> blocking = op.blockingParams();
 		if (!blocking.isEmpty()) {
@@ -168,6 +170,26 @@ public class OpModule extends AbstractModule implements Cancelable {
 	@Override
 	public String getCancelReason() {
 		return cancelReason;
+	}
+
+	// -- OpModule methods --
+
+	/**
+	 * What went wrong, or null if nothing did.
+	 * <p>
+	 * A module that does not finish has exactly one channel to say so --
+	 * {@link Cancelable} -- and SciJava uses it for both meanings, so a failed
+	 * op and a user pressing Cancel both come back {@linkplain #isCanceled()
+	 * canceled}. That is fine for the framework, which only wants to know
+	 * whether to display the outputs, and not fine for a script, which wants
+	 * to know whether to carry on. This is the difference: non-null means the
+	 * op threw, and the {@code TaskException} it returns carries the worker's
+	 * whole traceback.
+	 *
+	 * @return the exception, or null if the op succeeded or was canceled.
+	 */
+	public Exception failure() {
+		return failure;
 	}
 
 	// -- Helper methods --
@@ -298,6 +320,7 @@ public class OpModule extends AbstractModule implements Cancelable {
 		// happened in another interpreter, and a traceback squeezed into a
 		// status field is a traceback lost.
 		log.error("Op " + op.name() + " failed", exc);
+		failure = exc;
 		cancelReason = "Op " + op.name() + " failed: " + exc.getMessage();
 	}
 
