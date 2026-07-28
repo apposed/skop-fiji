@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<parent>
+		<groupId>org.scijava</groupId>
+		<artifactId>pom-scijava</artifactId>
+		<version>44.0.0</version>
+		<relativePath />
+	</parent>
+
+	<groupId>org.apposed</groupId>
+	<artifactId>skop-fiji</artifactId>
+	<version>0.1.0-SNAPSHOT</version>
+
+	<name>skop-fiji</name>
+	<description>scikit-ops in Fiji: every op, as its own SciJava command.</description>
+	<url>https://github.com/apposed/skop-fiji</url>
+	<inceptionYear>2026</inceptionYear>
+	<organization>
+		<name>Apposed</name>
+		<url>https://apposed.org/</url>
+	</organization>
+	<licenses>
+		<license>
+			<name>Simplified BSD License</name>
+			<distribution>repo</distribution>
+		</license>
+	</licenses>
+
+	<developers>
+		<developer>
+			<id>ctrueden</id>
+			<name>Curtis Rueden</name>
+			<url>https://github.com/ctrueden</url>
+			<roles>
+				<role>founder</role>
+				<role>lead</role>
+				<role>developer</role>
+				<role>debugger</role>
+				<role>reviewer</role>
+				<role>support</role>
+				<role>maintainer</role>
+			</roles>
+		</developer>
+	</developers>
+	<contributors>
+		<contributor>
+			<name>None</name>
+		</contributor>
+	</contributors>
+
+	<mailingLists>
+		<mailingList>
+			<name>Image.sc Forum</name>
+			<archive>https://forum.image.sc/</archive>
+		</mailingList>
+	</mailingLists>
+
+	<scm>
+		<connection>scm:git:https://github.com/apposed/skop-fiji</connection>
+		<developerConnection>scm:git:git@github.com:apposed/skop-fiji</developerConnection>
+		<tag>HEAD</tag>
+		<url>https://github.com/apposed/skop-fiji</url>
+	</scm>
+	<issueManagement>
+		<system>GitHub Issues</system>
+		<url>https://github.com/apposed/skop-fiji/issues</url>
+	</issueManagement>
+	<ciManagement>
+		<system>GitHub Actions</system>
+		<url>https://github.com/apposed/skop-fiji/actions</url>
+	</ciManagement>
+
+	<properties>
+		<package-name>org.apposed.skop.fiji</package-name>
+		<license.licenseName>bsd_2</license.licenseName>
+		<license.copyrightOwners>scikit-ops developers.</license.copyrightOwners>
+
+		<!--
+		NB: appose-java 0.12 is what named pixi sub-environments (Environment.activate)
+		and PixiInstallMonitor need, and skop's Runner already requires the same.
+		-->
+		<appose.version>0.12.0</appose.version>
+
+		<!--
+		NB: imglib2-appose 0.9.0 is the latest release, and it names appose
+		0.9.0. The explicit appose dependency above wins, which is what is
+		wanted: ShmImg is a thin wrapper over NDArray, and the parts of it this
+		project uses have not changed.
+		-->
+		<imglib2-appose.version>0.9.0</imglib2-appose.version>
+	</properties>
+
+	<repositories>
+		<repository>
+			<id>scijava.public</id>
+			<url>https://maven.scijava.org/content/groups/public</url>
+		</repository>
+	</repositories>
+
+	<dependencies>
+		<dependency>
+			<groupId>org.apposed</groupId>
+			<artifactId>appose</artifactId>
+			<version>${appose.version}</version>
+		</dependency>
+
+		<!--
+		Test dependencies.
+
+		NB: imglib2-appose is test-scoped on purpose. Nothing in main touches
+		ImgLib2 yet: SkopRunner speaks Appose and skop's wire format and
+		nothing else, which is what makes it testable headlessly. The image
+		types arrive with the roles, in the next phase.
+		-->
+		<dependency>
+			<groupId>net.imglib2</groupId>
+			<artifactId>imglib2-appose</artifactId>
+			<version>${imglib2-appose.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-api</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-engine</artifactId>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+</project>

@@ -1,0 +1,483 @@
+/*-
+ * #%L
+ * scikit-ops in Fiji: every op, as its own SciJava command.
+ * %%
+ * Copyright (C) 2026 scikit-ops developers.
+ * %%
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above copyright notice,
+ *    this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ * #L%
+ */
+{
+  "package": "skop.ops.toy",
+  "ops": [
+    {
+      "name": "skop.ops.morphology:dilation",
+      "module": "skop.ops.morphology",
+      "function": "dilation",
+      "env": "skimage",
+      "main_thread": false,
+      "exclusive": false,
+      "form": "function",
+      "doc": "Grow bright regions, by taking the maximum under the footprint.\n\nThe dual of :func:`erosion`: bright objects gain a border of ``radius``,\nand gaps narrower than the footprint close up. The usual use is joining a\nstructure that noise or thresholding has broken into pieces.\n\nArgs:\n    image: Image to dilate. Any number of axes; a trailing RGB(A) axis is\n        dilated channel by channel.\n    radius: Radius of the footprint, in pixels.\n    shape: Shape of the footprint.\n\nReturns:\n    The dilated image, in the input's dtype.",
+      "params": [
+        {
+          "name": "image",
+          "type": {
+            "name": "ndarray"
+          },
+          "required": true,
+          "role": "image",
+          "axes": {
+            "slots": [],
+            "variadic": true
+          }
+        },
+        {
+          "name": "radius",
+          "type": {
+            "name": "int"
+          },
+          "required": false,
+          "default": 1
+        },
+        {
+          "name": "shape",
+          "type": {
+            "name": "enum",
+            "choices": [
+              {
+                "name": "ball",
+                "value": "ball"
+              },
+              {
+                "name": "box",
+                "value": "box"
+              },
+              {
+                "name": "diamond",
+                "value": "diamond"
+              }
+            ],
+            "detail": "Footprint"
+          },
+          "required": false,
+          "default": "ball"
+        }
+      ],
+      "return_type": {
+        "name": "ndarray"
+      },
+      "return_role": "image",
+      "outputs": [
+        "result"
+      ],
+      "output_specs": [
+        {
+          "name": "result",
+          "type": {
+            "name": "ndarray"
+          },
+          "role": "image"
+        }
+      ]
+    },
+    {
+      "name": "skop.ops.threshold:otsu",
+      "module": "skop.ops.threshold",
+      "function": "otsu",
+      "env": "skimage",
+      "main_thread": false,
+      "exclusive": false,
+      "form": "function",
+      "doc": "Threshold an image by Otsu's method.\n\nChooses the threshold that minimizes the variance within the two classes\nit creates, which is the same as maximizing the variance between them.\nThe standard first thing to try, and what it assumes -- two comparably\nsized modes -- is also what it fails on.\n\nArgs:\n    image: Image to threshold. A trailing RGB(A) axis is collapsed.\n    invert: Whether to keep what falls below the threshold instead.\n    label_objects: Whether to label connected components, rather than\n        returning a plain binary mask.\n\nReturns:\n    A label image, or a 0/1 mask when ``label_objects`` is off.",
+      "params": [
+        {
+          "name": "image",
+          "type": {
+            "name": "ndarray"
+          },
+          "required": true,
+          "role": "image",
+          "axes": {
+            "slots": [],
+            "variadic": true
+          }
+        },
+        {
+          "name": "invert",
+          "type": {
+            "name": "bool"
+          },
+          "required": false,
+          "default": false
+        },
+        {
+          "name": "label_objects",
+          "type": {
+            "name": "bool"
+          },
+          "required": false,
+          "default": true
+        }
+      ],
+      "return_type": {
+        "name": "ndarray"
+      },
+      "return_role": "labels",
+      "outputs": [
+        "result"
+      ],
+      "output_specs": [
+        {
+          "name": "result",
+          "type": {
+            "name": "ndarray"
+          },
+          "role": "labels"
+        }
+      ]
+    },
+    {
+      "name": "skop.ops.toy:add",
+      "module": "skop.ops.toy",
+      "function": "add",
+      "env": "minimal",
+      "main_thread": false,
+      "exclusive": false,
+      "form": "function",
+      "doc": "Add two numbers. The smallest op there is.",
+      "params": [
+        {
+          "name": "a",
+          "type": {
+            "name": "int"
+          },
+          "required": true
+        },
+        {
+          "name": "b",
+          "type": {
+            "name": "int"
+          },
+          "required": true
+        }
+      ],
+      "return_type": {
+        "name": "int"
+      },
+      "return_role": null,
+      "outputs": [
+        "result"
+      ],
+      "output_specs": [
+        {
+          "name": "result",
+          "type": {
+            "name": "int"
+          }
+        }
+      ]
+    },
+    {
+      "name": "skop.ops.toy:find_nothing",
+      "module": "skop.ops.toy",
+      "function": "find_nothing",
+      "env": "minimal",
+      "main_thread": false,
+      "exclusive": false,
+      "form": "function",
+      "doc": "Return an empty result, as a segmentation that finds nothing would.",
+      "params": [
+        {
+          "name": "image",
+          "type": {
+            "name": "ndarray"
+          },
+          "required": true,
+          "role": "image"
+        }
+      ],
+      "return_type": {
+        "name": "unknown",
+        "detail": "Findings"
+      },
+      "return_role": null,
+      "outputs": [
+        "labels",
+        "points"
+      ],
+      "output_specs": [
+        {
+          "name": "labels",
+          "type": {
+            "name": "ndarray"
+          },
+          "role": "labels"
+        },
+        {
+          "name": "points",
+          "type": {
+            "name": "ndarray"
+          },
+          "role": "points"
+        }
+      ]
+    },
+    {
+      "name": "skop.ops.toy:probe",
+      "module": "skop.ops.toy",
+      "function": "probe",
+      "env": "minimal",
+      "main_thread": false,
+      "exclusive": false,
+      "form": "function",
+      "doc": "Report which interpreter is actually executing this op.",
+      "params": [],
+      "return_type": {
+        "name": "str"
+      },
+      "return_role": null,
+      "outputs": [
+        "result"
+      ],
+      "output_specs": [
+        {
+          "name": "result",
+          "type": {
+            "name": "str"
+          }
+        }
+      ]
+    },
+    {
+      "name": "skop.ops.toy:quadrants",
+      "module": "skop.ops.toy",
+      "function": "quadrants",
+      "env": "minimal",
+      "main_thread": false,
+      "exclusive": false,
+      "form": "function",
+      "doc": "Label a plane's four quadrants, 1 through 4.\n\nA strictly 2-D op, and the standing test case for adapting one: fed a\nstack, every plane numbers its own objects from 1, so a correct\nreassembly has to renumber them.",
+      "params": [
+        {
+          "name": "image",
+          "type": {
+            "name": "ndarray"
+          },
+          "required": true,
+          "role": "image",
+          "axes": {
+            "slots": [
+              {
+                "name": "y",
+                "optional": false
+              },
+              {
+                "name": "x",
+                "optional": false
+              }
+            ],
+            "variadic": false
+          }
+        }
+      ],
+      "return_type": {
+        "name": "ndarray"
+      },
+      "return_role": "labels",
+      "outputs": [
+        "result"
+      ],
+      "output_specs": [
+        {
+          "name": "result",
+          "type": {
+            "name": "ndarray"
+          },
+          "role": "labels"
+        }
+      ]
+    },
+    {
+      "name": "skop.ops.toy:scale",
+      "module": "skop.ops.toy",
+      "function": "scale",
+      "env": "minimal",
+      "main_thread": false,
+      "exclusive": false,
+      "form": "function",
+      "doc": "Scale an array, returning the result alongside its sum.\n\nExercises multi-output ops: the NamedTuple field names become the names\nof the task's outputs.",
+      "params": [
+        {
+          "name": "image",
+          "type": {
+            "name": "ndarray"
+          },
+          "required": true
+        },
+        {
+          "name": "factor",
+          "type": {
+            "name": "float"
+          },
+          "required": false,
+          "default": 2.0,
+          "ui": {
+            "widget_type": "FloatSlider",
+            "min": 0.0,
+            "max": 10.0,
+            "step": 0.1
+          }
+        }
+      ],
+      "return_type": {
+        "name": "unknown",
+        "detail": "ScaleResult"
+      },
+      "return_role": null,
+      "outputs": [
+        "scaled",
+        "total"
+      ],
+      "output_specs": [
+        {
+          "name": "scaled",
+          "type": {
+            "name": "ndarray"
+          }
+        },
+        {
+          "name": "total",
+          "type": {
+            "name": "float"
+          }
+        }
+      ]
+    },
+    {
+      "name": "skop.ops.toy:scale_into",
+      "module": "skop.ops.toy",
+      "function": "scale_into",
+      "env": "minimal",
+      "main_thread": false,
+      "exclusive": false,
+      "form": "computer",
+      "doc": "Computer form: fill a buffer the caller allocated.\n\nThe caller owns ``result``, so nothing is sent back over the wire. Note\nthat ``Out`` and a role compose: nested Annotated flattens, so ``result``\nis both an output buffer and an image.",
+      "params": [
+        {
+          "name": "image",
+          "type": {
+            "name": "ndarray"
+          },
+          "required": true,
+          "role": "image"
+        },
+        {
+          "name": "result",
+          "type": {
+            "name": "ndarray"
+          },
+          "required": true,
+          "direction": "Out",
+          "role": "image"
+        },
+        {
+          "name": "factor",
+          "type": {
+            "name": "float"
+          },
+          "required": false,
+          "default": 2.0
+        }
+      ],
+      "return_type": {
+        "name": "unknown",
+        "detail": "unannotated"
+      },
+      "return_role": null,
+      "outputs": [
+        "result"
+      ],
+      "output_specs": [
+        {
+          "name": "result",
+          "type": {
+            "name": "ndarray"
+          },
+          "role": "image"
+        }
+      ]
+    },
+    {
+      "name": "skop.ops.toy:slow_sum",
+      "module": "skop.ops.toy",
+      "function": "slow_sum",
+      "env": "minimal",
+      "main_thread": false,
+      "exclusive": false,
+      "form": "function",
+      "doc": "Sum an array slowly, reporting progress and honoring cancellation.",
+      "params": [
+        {
+          "name": "image",
+          "type": {
+            "name": "ndarray"
+          },
+          "required": true
+        },
+        {
+          "name": "steps",
+          "type": {
+            "name": "int"
+          },
+          "required": false,
+          "default": 5
+        }
+      ],
+      "return_type": {
+        "name": "float"
+      },
+      "return_role": null,
+      "outputs": [
+        "result"
+      ],
+      "output_specs": [
+        {
+          "name": "result",
+          "type": {
+            "name": "float"
+          }
+        }
+      ]
+    }
+  ],
+  "failures": [
+    {
+      "module": "skop.ops.pretend",
+      "error": "ModuleNotFoundError: No module named tensorflow",
+      "heavy_imports": [
+        "tensorflow (line 3)"
+      ],
+      "message": "Op module 'skop.ops.pretend' could not be loaded: ModuleNotFoundError: No module named tensorflow"
+    }
+  ]
+}
