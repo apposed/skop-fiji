@@ -23,7 +23,7 @@ log with its Python traceback intact.
 | P1 | `SkopRunner`, and a headless test running `toy:add` and `threshold:otsu` on a `ShmImg` from Java | done |
 | P2 | dynamic module registration, image in and image out, progress, cancel, errors | done |
 | P3 | the rest of the roles: `ImgLabeling`, ROIs, tables, masks in the ROI Manager | done |
-| P4 | axis-mapping UI, environment manager, update site, macro-recording polish | next |
+| P4 | axis-mapping UI (done), environment manager, update site, macro-recording polish | in progress |
 
 | Role | Becomes |
 | --- | --- |
@@ -47,6 +47,8 @@ Labelings.java      label array <-> ImgLabeling, over the worker's own block
 Rois.java           boxes, points and masks <-> ROIs; coordinates reverse here too
 Tables.java         an (N, C) array -> a Table
 Docs.java           a Google-style docstring -> the text a dialog shows
+AxisMapping.java    the per-axis decisions, as widgets
+AxisPreprocessor    builds them, just before the dialog is drawn
 Axes.java           ImgLib2 axis labels -> skop's; the order flip lives here
 SkopRunner.java     a port of skop's runner.py: build, one service per environment, invoke
 wire/               reading the JSON skop sends
@@ -64,10 +66,13 @@ is what makes the boundary testable without a running Fiji.
 - **A dialog generated from the op's signature**, with the docstring's
   `Args:` entries as tooltips, sliders where skop asked for sliders, and
   choice lists for enums.
-- **2-D ops that work on stacks.** An `ImgPlus` says what its axes are, so
-  they are read, handed to `skop.plan`, and a strictly 2-D op is iterated over
-  a stack without anyone being asked anything. skop's default plan never
-  discards data; its warnings go to the log.
+- **2-D ops that work on stacks, and an argument with how.** An `ImgPlus`
+  says what its axes are, so they are read, handed to `skop.plan`, and a
+  strictly 2-D op is iterated over a stack. The dialog then shows that
+  decision and lets you change it: which of the image's axes fills each slot
+  the op consumes, and for each axis left over, whether to iterate it, take a
+  single position, or hand it through whole. The default is what skop would
+  have done unasked, and it never discards data.
 - **A stable macro identifier**, `skop:skop.ops.threshold:otsu`.
 - **Failures that say what happened.** A worker's traceback reaches the log
   whole. A script can tell a failure from a user-pressed Cancel with
@@ -75,8 +80,11 @@ is what makes the boundary testable without a running Fiji.
 
 ## What it does not do yet
 
-- No axis-mapping UI. skop's default plan is accepted as-is, which is the
-  documented fallback and never loses data -- but it is the fallback.
+- No environment manager, no update site.
+- The mapping widgets need an image already in the parameter when the dialog
+  opens, which ImageJ's `ActiveImagePreprocessor` handles for the usual case
+  of one image parameter and an open image. Without one, the op still runs on
+  skop's default plan.
 - `vectors` and `surface` still fall back to `Dataset` -- lossless, but not
   an Overlay of arrows or a mesh. No op produces either yet.
 - A result's shared memory is deliberately never released. See

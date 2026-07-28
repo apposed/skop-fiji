@@ -31,6 +31,7 @@ package org.apposed.skop.fiji;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -261,11 +262,28 @@ public class ModulesTest {
 	}
 
 	@Test
-	public void testAModuleKnowsItsOwnInfo() throws Exception {
-		OpModuleInfo info = info("skop.ops.toy:add");
-		org.scijava.module.Module module = info.createModule();
+	public void testAModuleGetsAnInfoOfItsOwn() throws Exception {
+		// Not the registered one: the axis-mapping items depend on the image
+		// this run was given, so two runs must not share a list of items. What
+		// has to survive the copy is the identity -- the menu path a user
+		// clicked and the string a macro recorded.
+		OpModuleInfo registered = info("skop.ops.toy:add");
+		org.scijava.module.Module module = registered.createModule();
+
 		assertTrue(module instanceof OpModule);
-		assertEquals(info, module.getInfo());
+		assertNotSame(registered, module.getInfo());
+		assertEquals(registered.getIdentifier(), module.getInfo().getIdentifier());
+		assertEquals(registered.getMenuPath().getMenuString(),
+			((OpModuleInfo) module.getInfo()).getMenuPath().getMenuString());
+		assertEquals(registered.op().name(),
+			((OpModuleInfo) module.getInfo()).op().name());
+	}
+
+	@Test
+	public void testTwoModulesDoNotShareItems() throws Exception {
+		OpModuleInfo registered = info("skop.ops.toy:add");
+		assertNotSame(registered.createModule().getInfo(),
+			registered.createModule().getInfo());
 	}
 
 	// -- the cache round trip ----------------------------------------------

@@ -268,8 +268,15 @@ public class OpModule extends AbstractModule implements Cancelable {
 			// anything; the rest are passed through as they are.
 			if (param == null || param.axes() == null) continue;
 			NDArray array = (NDArray) args.get(entry.getKey());
+			List<String> labels = entry.getValue();
+			// What the user chose, if they were offered the choice at all.
+			// Absent everywhere, this is exactly skop's own default plan.
 			AdaptationPlan plan = skop.runner().plan(op.name(), entry.getKey(),
-				Axes.numpyShape(array), entry.getValue());
+				Axes.numpyShape(array), labels,
+				AxisMapping.positions(this, entry.getKey(), labels),
+				AxisMapping.mapping(this, entry.getKey(),
+					param.axes().slots().size(), labels),
+				AxisMapping.dispositions(this, entry.getKey(), labels));
 			for (String warning : plan.warnings()) {
 				log.warn(op.name() + ": " + warning);
 			}

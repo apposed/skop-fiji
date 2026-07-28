@@ -109,7 +109,13 @@ public class OpModuleInfo extends DefaultMutableModuleInfo {
 		// Note: the inherited implementation calls a no-argument constructor,
 		// which cannot work here -- one class serves every op, so an instance
 		// is useless without knowing which one it is.
-		return new OpModule(this);
+		//
+		// The module also gets an info of its own rather than this one, because
+		// the axis-mapping items depend on the image *this* run was given: two
+		// people thresholding two differently shaped stacks at the same time
+		// must not be editing the same list of items. This is the same move
+		// DynamicCommand makes, for the same reason.
+		return new OpModule(new OpModuleInfo(context, op));
 	}
 
 	@Override
