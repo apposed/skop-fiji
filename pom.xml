@@ -102,20 +102,30 @@
 			<version>${appose.version}</version>
 		</dependency>
 
-		<!--
-		Test dependencies.
+		<!-- Modules, services, the input harvester. -->
+		<dependency>
+			<groupId>org.scijava</groupId>
+			<artifactId>scijava-common</artifactId>
+		</dependency>
 
-		NB: imglib2-appose is test-scoped on purpose. Nothing in main touches
-		ImgLib2 yet: SkopRunner speaks Appose and skop's wire format and
-		nothing else, which is what makes it testable headlessly. The image
-		types arrive with the roles, in the next phase.
-		-->
+		<!-- Images: Dataset, ImgPlus, and the axes an ImgPlus carries. -->
+		<dependency>
+			<groupId>net.imagej</groupId>
+			<artifactId>imagej-common</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>net.imglib2</groupId>
+			<artifactId>imglib2</artifactId>
+		</dependency>
+
+		<!-- ShmImg: an Img whose pixels are the shared memory a worker reads. -->
 		<dependency>
 			<groupId>net.imglib2</groupId>
 			<artifactId>imglib2-appose</artifactId>
 			<version>${imglib2-appose.version}</version>
-			<scope>test</scope>
 		</dependency>
+
+		<!-- Test dependencies -->
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter-api</artifactId>

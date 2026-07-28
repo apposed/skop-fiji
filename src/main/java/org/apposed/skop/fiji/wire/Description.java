@@ -52,10 +52,19 @@ public class Description {
 		private final String error;
 		private final List<String> heavyImports;
 		private final String message;
+		private final Map<String, Object> raw;
 
 		public LoadFailure(String module, String error, List<String> heavyImports,
 			String message)
 		{
+			this(module, error, heavyImports, message,
+				Collections.<String, Object>emptyMap());
+		}
+
+		private LoadFailure(String module, String error, List<String> heavyImports,
+			String message, Map<String, Object> raw)
+		{
+			this.raw = Wire.copy(raw);
 			this.module = module;
 			this.error = error;
 			this.heavyImports = Collections.unmodifiableList(
@@ -87,6 +96,11 @@ public class Description {
 			return message;
 		}
 
+		/** The JSON this was read from. See {@link OpSpec#toJson()}. */
+		public Map<String, Object> toJson() {
+			return raw;
+		}
+
 		@Override
 		public String toString() {
 			return message;
@@ -97,15 +111,24 @@ public class Description {
 				Wire.string(data, "module"),
 				Wire.string(data, "error"),
 				java.util.Arrays.asList(Wire.strings(data, "heavy_imports")),
-				Wire.string(data, "message"));
+				Wire.string(data, "message"),
+				data);
 		}
 	}
 
 	private final String pkg;
 	private final List<OpSpec> ops;
 	private final List<LoadFailure> failures;
+	private final Map<String, Object> raw;
 
 	public Description(String pkg, List<OpSpec> ops, List<LoadFailure> failures) {
+		this(pkg, ops, failures, Collections.<String, Object>emptyMap());
+	}
+
+	private Description(String pkg, List<OpSpec> ops, List<LoadFailure> failures,
+		Map<String, Object> raw)
+	{
+		this.raw = Wire.copy(raw);
 		this.pkg = pkg;
 		this.ops = Collections.unmodifiableList(new ArrayList<>(ops));
 		this.failures = Collections.unmodifiableList(new ArrayList<>(failures));
@@ -132,6 +155,15 @@ public class Description {
 		return null;
 	}
 
+	/**
+	 * The JSON this was read from, ready to be cached and read back.
+	 *
+	 * @return the original JSON, or an empty map if built by hand.
+	 */
+	public Map<String, Object> toJson() {
+		return raw;
+	}
+
 	@Override
 	public String toString() {
 		return pkg + ": " + ops.size() + " op(s), " + failures.size() + " failure(s)";
@@ -146,6 +178,6 @@ public class Description {
 		for (Map<String, Object> failure : Wire.maps(data, "failures")) {
 			failures.add(LoadFailure.fromJson(failure));
 		}
-		return new Description(Wire.string(data, "package"), ops, failures);
+		return new Description(Wire.string(data, "package"), ops, failures, data);
 	}
 }

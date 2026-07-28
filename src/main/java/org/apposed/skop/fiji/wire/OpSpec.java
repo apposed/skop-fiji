@@ -64,12 +64,25 @@ public class OpSpec {
 	private final Role returnRole;
 	private final List<String> outputs;
 	private final List<OutputSpec> outputSpecs;
+	private final Map<String, Object> raw;
 
 	public OpSpec(String name, String module, String function, String env,
 		boolean mainThread, boolean exclusive, Form form, String doc,
 		List<ParamSpec> params, TypeSpec returnType, Role returnRole,
 		List<String> outputs, List<OutputSpec> outputSpecs)
 	{
+		this(name, module, function, env, mainThread, exclusive, form, doc,
+			params, returnType, returnRole, outputs, outputSpecs,
+			java.util.Collections.emptyMap());
+	}
+
+	private OpSpec(String name, String module, String function, String env,
+		boolean mainThread, boolean exclusive, Form form, String doc,
+		List<ParamSpec> params, TypeSpec returnType, Role returnRole,
+		List<String> outputs, List<OutputSpec> outputSpecs,
+		Map<String, Object> raw)
+	{
+		this.raw = Wire.copy(raw);
 		this.name = name;
 		this.module = module;
 		this.function = function;
@@ -185,6 +198,20 @@ public class OpSpec {
 		return end < 0 ? doc : doc.substring(0, end);
 	}
 
+	/**
+	 * The JSON this was read from, ready to be written back out.
+	 * <p>
+	 * A description is cached on disk between launches, and a cache written
+	 * from a re-serialization of what this class happens to model would lose
+	 * whatever it does not model yet. Keeping the original means the cache is
+	 * exactly as good as the answer that produced it.
+	 *
+	 * @return the original JSON, or an empty map if this spec was built by hand.
+	 */
+	public Map<String, Object> toJson() {
+		return raw;
+	}
+
 	@Override
 	public String toString() {
 		return name;
@@ -212,6 +239,7 @@ public class OpSpec {
 			TypeSpec.fromJson(Wire.map(data, "return_type")),
 			Role.forWire(Wire.optionalString(data, "return_role")),
 			java.util.Arrays.asList(Wire.strings(data, "outputs")),
-			outputSpecs);
+			outputSpecs,
+			data);
 	}
 }

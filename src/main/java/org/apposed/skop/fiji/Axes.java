@@ -33,6 +33,10 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
+import net.imagej.axis.AxisType;
+import net.imagej.axis.TypedAxis;
+import net.imagej.space.TypedSpace;
+
 import org.apposed.appose.NDArray;
 
 /**
@@ -116,6 +120,59 @@ public final class Axes {
 		for (int dim : dims) result.add(dim);
 		return result;
 	}
+
+	/**
+	 * The axis labels an image carries, in ImgLib2 order.
+	 * <p>
+	 * An {@code ImgPlus} <em>says</em> what its axes are, which is the whole
+	 * difference from the napari front end: skop-napari spends a module
+	 * working out a layer's axes from metadata, xarray dims, NGFF axes and
+	 * {@code rgb}, and leaves unnamed whatever none of those settle. Here the
+	 * answer is simply read.
+	 * <p>
+	 * Labels are passed through as ImageJ spells them -- {@code "Channel"},
+	 * {@code "Time"} -- because skop's own alias table already speaks that
+	 * vocabulary; it was assembled from ImageJ2's {@code AxisType} among
+	 * others. An axis type this side does not recognize is passed through too,
+	 * unchanged: an axis label is any string, and a lifetime bin has as much
+	 * right to a name as z does.
+	 *
+	 * @param space the image, or anything else that knows its axis types.
+	 * @return one label per dimension, x first; a null entry for an axis whose
+	 *         type is ImageJ's explicit "unknown", which says nothing and so
+	 *         must not pretend to.
+	 */
+	public static List<String> labelsOf(TypedSpace<? extends TypedAxis> space) {
+		List<String> labels = new ArrayList<>(space.numDimensions());
+		for (int d = 0; d < space.numDimensions(); d++) {
+			AxisType type = space.axis(d).type();
+			String label = type == null ? null : type.getLabel();
+			labels.add(label == null || label.equals(UNKNOWN) ? null : label);
+		}
+		return labels;
+	}
+
+	/**
+	 * The axis labels an image carries, in the numpy order skop wants.
+	 * <p>
+	 * {@link #labelsOf} and {@link #toNumpy} in one call, because doing them
+	 * separately is doing them in the wrong order half the time.
+	 *
+	 * @param space the image, or anything else that knows its axis types.
+	 * @return one label per dimension, last-fastest.
+	 */
+	public static List<String> numpyLabelsOf(TypedSpace<? extends TypedAxis> space) {
+		return toNumpy(labelsOf(space));
+	}
+
+	/**
+	 * How ImageJ spells an axis whose type it does not know.
+	 * <p>
+	 * Distinct from a label skop does not recognize: {@code "lifetime"} is a
+	 * real name for a real axis and travels as itself, while this one is the
+	 * absence of a name and travels as null.
+	 */
+	private static final String UNKNOWN = net.imagej.axis.Axes.UNKNOWN_LABEL;
 
 	/**
 	 * The index the same axis has in the other order.

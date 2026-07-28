@@ -10,30 +10,65 @@ for what that means and why it is shaped this way.
 
 ## Where this is
 
-**Phase 1 of five.** There is no UI yet. What exists is the boundary
-underneath one: Java builds the environments, drives the workers, reads the op
-specs, and runs ops on shared memory it allocated itself.
+**Phase 2 of five: one command per op, images in and out.** Every op skop can
+find is registered as its own SciJava module at startup, with a generated
+dialog, a menu entry, a search-bar hit and a recordable identifier. Images go
+in and come out as `Dataset`s, progress reaches the status bar, Cancel reaches
+the worker, and a failure reaches the log with its Python traceback intact.
 
 | | | |
 | --- | --- | --- |
 | P0 | in scikit-ops: `OpSpec` as JSON, `describe`/`plan` tasks, a pinned skop in each environment | done |
 | P1 | `SkopRunner`, and a headless test running `toy:add` and `threshold:otsu` on a `ShmImg` from Java | done |
-| P2 | dynamic module registration, image in and image out, progress, cancel, errors | next |
-| P3 | the rest of the roles: `ImgLabeling`, ROIs, tables, masks in the ROI Manager | |
+| P2 | dynamic module registration, image in and image out, progress, cancel, errors | done |
+| P3 | the rest of the roles: `ImgLabeling`, ROIs, tables, masks in the ROI Manager | next |
 | P4 | axis-mapping UI, environment manager, update site, macro-recording polish | |
+
+Every array is a `Dataset` for now, in and out -- a set of coordinates
+rendered as an N&times;3 image is not useful, but it is lossless, which a
+dropped output is not. `Roles` is where that gets better.
 
 ## What is here
 
 ```
-SkopRunner.java   a port of skop's runner.py: build, one service per environment, invoke
-Axes.java         ImgLib2 axis labels -> skop's; the order flip lives here
-wire/             reading the JSON skop sends
+SkopService.java    finds the ops, registers one command each, owns the runner
+OpModuleInfo.java   OpSpec -> ModuleInfo: menu path, items, the macro identifier
+OpModule.java       one run: encode, dispatch, decode; progress, cancel, errors
+Params.java         ParamSpec -> MutableModuleItem
+Roles.java          Role -> Fiji type; the only Fiji-specific lookup table
+Images.java         Dataset <-> NDArray, without a copy where there needn't be one
+Docs.java           a Google-style docstring -> the text a dialog shows
+Axes.java           ImgLib2 axis labels -> skop's; the order flip lives here
+SkopRunner.java     a port of skop's runner.py: build, one service per environment, invoke
+wire/               reading the JSON skop sends
 ```
 
-`SkopRunner` knows about Appose and about skop's wire format, and about
-nothing else -- there is no ImgLib2 type and no SciJava service in it. That is
-what makes it testable without a running Fiji, which is the whole point of
-doing it first.
+`SkopRunner` and `wire/` know about Appose and about skop's wire format, and
+about nothing else -- no ImgLib2 type and no SciJava service in either. That
+is what makes the boundary testable without a running Fiji.
+
+## What a user gets
+
+- **One command per op.** `Plugins ▸ scikit-ops ▸ Threshold ▸ Otsu`, and the
+  same thing in the search bar, because `ModuleSearcher` indexes
+  `ModuleService`. No op-picker panel: the search bar *is* the browse view.
+- **A dialog generated from the op's signature**, with the docstring's
+  `Args:` entries as tooltips, sliders where skop asked for sliders, and
+  choice lists for enums.
+- **2-D ops that work on stacks.** An `ImgPlus` says what its axes are, so
+  they are read, handed to `skop.plan`, and a strictly 2-D op is iterated over
+  a stack without anyone being asked anything. skop's default plan never
+  discards data; its warnings go to the log.
+- **A stable macro identifier**, `skop:skop.ops.threshold:otsu`.
+
+## What it does not do yet
+
+- No axis-mapping UI. skop's default plan is accepted as-is, which is the
+  documented fallback and never loses data -- but it is the fallback.
+- Labels are shown as images rather than as `ImgLabeling`s; ROIs, tables and
+  the ROI Manager are not wired up. That is the next phase.
+- A result's shared memory is deliberately never released. See
+  `Images.adopt`.
 
 ## Architecture, in one paragraph
 
@@ -64,15 +99,18 @@ Java 11+ and Maven:
 mvn test
 ```
 
-`AxesTest` and `WireTest` run anywhere. `SkopRunnerTest` needs a scikit-ops
-checkout and will build environments -- which, the first time, means a
-download. It looks for the checkout in this order:
+`AxesTest`, `WireTest`, `DocsTest` and `ModulesTest` run anywhere.
+`SkopRunnerTest` and `SkopServiceTest` need a scikit-ops checkout and will
+build environments -- which, the first time, means a download. The checkout is
+looked for in this order:
 
 1. `-Dskop.checkout=/path/to/scikit-ops`
 2. `$SKOP_CHECKOUT`
 3. `../scikit-ops`
 
-and skips rather than fails if it finds none.
+and those tests skip rather than fail if there is none. `-Dskop.noAutoDiscover=true`
+stops `SkopService` from describing the ops at startup, which is occasionally
+what you want in a test.
 
 Environments land in Appose's shared directory rather than anywhere under a
 Fiji installation, which means **skop-napari and skop-fiji share them**: a
