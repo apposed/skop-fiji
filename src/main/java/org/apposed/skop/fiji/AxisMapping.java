@@ -154,18 +154,6 @@ public final class AxisMapping {
 		}
 	}
 
-	/**
-	 * Whether a module has any mapping items at all.
-	 *
-	 * @param module the module.
-	 * @return whether a user was offered the choice.
-	 */
-	public static boolean isMapped(Module module, String param) {
-		for (org.scijava.module.ModuleItem<?> item : module.getInfo().inputs()) {
-			if (item.getName().startsWith(PREFIX + param + ".")) return true;
-		}
-		return false;
-	}
 
 	/**
 	 * The slot mapping a user chose, or null if they were not asked.

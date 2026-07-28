@@ -39,7 +39,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 import net.imagej.Dataset;
 import net.imagej.DatasetService;
@@ -51,7 +50,6 @@ import net.imglib2.roi.labeling.LabelRegions;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.FloatType;
 
-import org.apposed.skop.fiji.wire.AdaptationPlan;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
