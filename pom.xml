@@ -76,6 +76,9 @@
 		<package-name>org.apposed.skop.fiji</package-name>
 		<license.licenseName>bsd_2</license.licenseName>
 		<license.copyrightOwners>scikit-ops developers.</license.copyrightOwners>
+		<!-- NB: describe.json is captured skop output. A license header in it
+		     is not a comment, it is a parse error. -->
+		<license.excludes>**/*.json</license.excludes>
 
 		<!--
 		NB: appose-java 0.12 is what named pixi sub-environments (Environment.activate)
