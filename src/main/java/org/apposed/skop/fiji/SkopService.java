@@ -179,8 +179,12 @@ public class SkopService extends AbstractService implements SciJavaService {
 				pending = null;
 			}
 			if (error != null) {
-				log.error("scikit-ops is not available; no ops were registered.",
-					error);
+				// Note: says what happened, and does not guess why. The
+				// previous wording here claimed scikit-ops was unavailable,
+				// which sent at least one person looking at their Python
+				// environment when the environment was fine and the fault was
+				// on this side of the wire.
+				log.error("Could not register scikit-ops' ops.", error);
 			}
 		});
 		return pending;
@@ -240,12 +244,22 @@ public class SkopService extends AbstractService implements SciJavaService {
 		description = found;
 
 		List<OpModuleInfo> infos = new ArrayList<>(found.ops().size());
+		List<String> workflows = new ArrayList<>();
 		for (OpSpec op : found.ops()) {
+			if (op.isWorkflow()) {
+				// A workflow's body calls skop.run on the ops a caller chose,
+				// so it needs a Python runner ambient around it. This front end
+				// deliberately has none: it drives the workers itself. Until
+				// that is settled, a workflow is listed nowhere rather than
+				// listed and broken.
+				workflows.add(op.name());
+				continue;
+			}
 			try {
 				infos.add(new OpModuleInfo(getContext(), op));
 			}
 			catch (Exception exc) {
-				// One malformed op must not cost the other fifty-eight their
+				// One malformed op must not cost the other sixty-two their
 				// menu entries -- the same rule discovery itself follows.
 				log.error("Could not register op " + op.name(), exc);
 			}
@@ -256,6 +270,16 @@ public class SkopService extends AbstractService implements SciJavaService {
 		log.info("scikit-ops: registered " + infos.size() + " op(s)");
 		for (Description.LoadFailure failure : found.failures()) {
 			log.warn(failure.message());
+		}
+		for (Description.ReadFailure failure : found.unreadable()) {
+			// This side is behind skop, which is worth saying loudly, and is
+			// not worth costing anyone the other ops.
+			log.error("scikit-ops: " + failure);
+		}
+		if (!workflows.isEmpty()) {
+			log.info("scikit-ops: " + workflows.size() + " workflow op(s) not " +
+				"registered, because running one needs a Python runner this " +
+				"front end does not have: " + String.join(", ", workflows));
 		}
 		for (OpModuleInfo info : infos) {
 			for (ParamSpec param : info.unrenderableParams()) {

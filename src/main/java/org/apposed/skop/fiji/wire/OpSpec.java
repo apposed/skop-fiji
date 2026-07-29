@@ -112,9 +112,29 @@ public class OpSpec {
 		return function;
 	}
 
-	/** ID of the environment this op runs in, naming {@code envs/<id>/}. */
+	/**
+	 * ID of the environment this op runs in, naming {@code envs/<id>/}, or
+	 * null if it has none.
+	 * <p>
+	 * Null means a <em>workflow</em>: an op that composes other ops and so
+	 * runs wherever they do rather than anywhere itself. See
+	 * {@link #isWorkflow()}.
+	 */
 	public String env() {
 		return env;
+	}
+
+	/**
+	 * Whether this op composes other ops rather than computing anything.
+	 * <p>
+	 * The absence of an environment is the marker -- {@code @op()} with no
+	 * {@code env} -- so there is no flag to read and nothing to keep in step.
+	 * A workflow's body calls {@code skop.run} on the ops a caller chose,
+	 * which means it needs a Python runner to be ambient around it, which is
+	 * the one thing this front end does not have.
+	 */
+	public boolean isWorkflow() {
+		return env == null;
 	}
 
 	/** Whether the op must run on the worker's main thread. */
@@ -230,7 +250,7 @@ public class OpSpec {
 			Wire.string(data, "name"),
 			Wire.string(data, "module"),
 			Wire.string(data, "function"),
-			Wire.string(data, "env"),
+			Wire.optionalString(data, "env"),
 			Wire.bool(data, "main_thread", false),
 			Wire.bool(data, "exclusive", false),
 			Form.forWire(Wire.string(data, "form")),

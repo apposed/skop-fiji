@@ -307,7 +307,7 @@ public class AxisFieldTest {
 				new AxisType[] { Axes.X, Axes.Y, Axes.Z }));
 		module.setInput(OpModuleInfo.axisItemName("image"), "x y");
 
-		OpModule ran = (OpModule) run(module);
+		OpModule ran = (OpModule) Quiet.run(context, () -> run(module));
 		assertTrue(ran.isCanceled());
 		assertTrue(ran.getCancelReason().contains("2 token(s)"),
 			ran.getCancelReason());

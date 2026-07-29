@@ -107,10 +107,30 @@ public class SkopRunnerTest {
 	@Test
 	public void testDescribeFindsTheOps() {
 		assertFalse(description.ops().isEmpty());
-		assertEquals(Collections.emptyList(), description.failures(),
-			"every op module should import in the minimal environment");
 		assertNotNull(description.op("skop.ops.toy:add"));
 		assertNotNull(description.op("skop.ops.threshold:otsu"));
+	}
+
+	@Test
+	public void testAModuleThatWillNotImportCostsOnlyItself() {
+		// Not an assertion that the checkout is tidy -- somebody is always
+		// halfway through writing an op, and a half-written one must not empty
+		// this front end's menu. What is asserted is that the rest arrive and
+		// that the casualty is *reported* rather than swallowed.
+		assertTrue(description.ops().size() > 1);
+		for (Description.LoadFailure failure : description.failures()) {
+			assertNotNull(failure.module());
+			assertFalse(failure.error().isEmpty(), failure.module());
+			assertTrue(failure.message().contains(failure.module()));
+		}
+	}
+
+	@Test
+	public void testThisSideCanReadEverythingSkopSaid() {
+		// A read failure means skop grew a field this Java has not learned,
+		// which is a different problem from an op that will not import and has
+		// a different fix: here, rather than there.
+		assertEquals(Collections.emptyList(), description.unreadable());
 	}
 
 	@Test

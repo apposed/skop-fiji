@@ -47,6 +47,7 @@ import net.imagej.Dataset;
 import org.apposed.appose.util.Json;
 import org.apposed.skop.fiji.wire.Description;
 import org.apposed.skop.fiji.wire.OpSpec;
+import org.apposed.skop.fiji.wire.ParamSpec;
 import org.apposed.skop.fiji.wire.Wire;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -230,13 +231,35 @@ public class ModulesTest {
 	// -- registration ------------------------------------------------------
 
 	@Test
-	public void testEveryFixtureOpBuildsAModule() {
+	public void testEveryOrdinaryFixtureOpBuildsAWholeModule() {
 		for (OpSpec op : description.ops()) {
+			if (op.isWorkflow()) continue;
 			OpModuleInfo info = new OpModuleInfo(context, op);
 			assertNotNull(info.getMenuPath());
 			assertTrue(info.unrenderableParams().isEmpty(),
 				op.name() + " lost a parameter: " + info.unrenderableParams());
 		}
+	}
+
+	@Test
+	public void testAWorkflowIsTheCaseThisCannotRenderYet() {
+		// A workflow's stages are Callables and dicts of the chosen op's
+		// settings, and neither is a widget this side knows how to draw. That
+		// is why SkopService does not register one -- and the parameters it
+		// would have lost are named here rather than discovered later.
+		OpModuleInfo info =
+			info("skop.ops.workflows.mask.detect_then_mask:detect_then_mask");
+		assertTrue(info.op().isWorkflow());
+		assertEquals(
+			java.util.Arrays.asList("detector", "detector_args", "masker",
+				"masker_args"),
+			names(info.unrenderableParams()));
+	}
+
+	private static List<String> names(List<ParamSpec> params) {
+		List<String> result = new ArrayList<>();
+		for (ParamSpec param : params) result.add(param.name());
+		return result;
 	}
 
 	@Test

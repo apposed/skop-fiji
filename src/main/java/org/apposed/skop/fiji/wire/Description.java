@@ -116,18 +116,55 @@ public class Description {
 		}
 	}
 
+	/**
+	 * An op skop described that this side could not read.
+	 * <p>
+	 * A different thing from a {@link LoadFailure}, and worth keeping apart:
+	 * that one means skop could not import a module, and the fix is in the op.
+	 * This one means skop described the op perfectly well and <em>this Java</em>
+	 * did not understand the description -- so the fix is here, and usually the
+	 * fix is that skop grew a field this reader has not learned.
+	 */
+	public static class ReadFailure {
+
+		private final String name;
+		private final String error;
+
+		public ReadFailure(String name, String error) {
+			this.name = name;
+			this.error = error;
+		}
+
+		/** The op's ID, or a best guess if even that could not be read. */
+		public String name() {
+			return name;
+		}
+
+		public String error() {
+			return error;
+		}
+
+		@Override
+		public String toString() {
+			return "Could not read op '" + name + "': " + error;
+		}
+	}
+
 	private final String pkg;
 	private final List<OpSpec> ops;
 	private final List<LoadFailure> failures;
+	private final List<ReadFailure> unreadable;
 	private final Map<String, Object> raw;
 
 	public Description(String pkg, List<OpSpec> ops, List<LoadFailure> failures) {
-		this(pkg, ops, failures, Collections.<String, Object>emptyMap());
+		this(pkg, ops, failures, Collections.<ReadFailure>emptyList(),
+			Collections.<String, Object>emptyMap());
 	}
 
 	private Description(String pkg, List<OpSpec> ops, List<LoadFailure> failures,
-		Map<String, Object> raw)
+		List<ReadFailure> unreadable, Map<String, Object> raw)
 	{
+		this.unreadable = Collections.unmodifiableList(new ArrayList<>(unreadable));
 		this.raw = Wire.copy(raw);
 		this.pkg = pkg;
 		this.ops = Collections.unmodifiableList(new ArrayList<>(ops));
@@ -145,6 +182,19 @@ public class Description {
 
 	public List<LoadFailure> failures() {
 		return failures;
+	}
+
+	/**
+	 * The ops this side could not read, and why.
+	 * <p>
+	 * Empty, nearly always. When it is not, the other ops are still here and
+	 * still work -- one op skop describes in a way this reader has not caught
+	 * up with must not cost the other sixty-two their menu entries, which is
+	 * the same rule skop's own discovery holds to when a module will not
+	 * import.
+	 */
+	public List<ReadFailure> unreadable() {
+		return unreadable;
 	}
 
 	/** The op of the given ID, or null if there is none. */
@@ -171,13 +221,26 @@ public class Description {
 
 	public static Description fromJson(Map<String, Object> data) {
 		List<OpSpec> ops = new ArrayList<>();
+		List<ReadFailure> unreadable = new ArrayList<>();
 		for (Map<String, Object> op : Wire.maps(data, "ops")) {
-			ops.add(OpSpec.fromJson(op));
+			// One op at a time, because one op this reader does not understand
+			// must cost only itself. Reading the whole list or nothing is how
+			// a single new field empties a menu.
+			try {
+				ops.add(OpSpec.fromJson(op));
+			}
+			catch (RuntimeException exc) {
+				Object name = op.get("name");
+				unreadable.add(new ReadFailure(
+					name == null ? "(unnamed)" : String.valueOf(name),
+					exc.getMessage()));
+			}
 		}
 		List<LoadFailure> failures = new ArrayList<>();
 		for (Map<String, Object> failure : Wire.maps(data, "failures")) {
 			failures.add(LoadFailure.fromJson(failure));
 		}
-		return new Description(Wire.string(data, "package"), ops, failures, data);
+		return new Description(Wire.string(data, "package"), ops, failures,
+			unreadable, data);
 	}
 }

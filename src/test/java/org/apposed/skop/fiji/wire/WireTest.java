@@ -165,6 +165,90 @@ public class WireTest {
 		assertNull(Role.forWire(null));
 	}
 
+	// -- workflows ---------------------------------------------------------
+
+	@Test
+	public void testAWorkflowHasNoEnvironment() {
+		// The absence of an environment is the marker: a workflow composes
+		// other ops and so runs wherever they do, rather than anywhere itself.
+		OpSpec workflow = op("skop.ops.workflows.mask.detect_then_mask:detect_then_mask");
+		assertNull(workflow.env());
+		assertTrue(workflow.isWorkflow());
+
+		assertFalse(op("skop.ops.toy:add").isWorkflow());
+		assertEquals("minimal", op("skop.ops.toy:add").env());
+	}
+
+	@Test
+	public void testAWorkflowsChoosers() {
+		OpSpec workflow = op("skop.ops.workflows.mask.detect_then_mask:detect_then_mask");
+
+		ParamSpec detector = workflow.param("detector");
+		assertEquals(2, detector.choices().size());
+		assertEquals("object_aware_yolo", detector.choices().get(0).label());
+		assertEquals("skop.ops.detect.object_aware_yolo:object_aware_yolo",
+			detector.choices().get(0).op());
+		// Curated, not discovered: a list means "these have been tested
+		// together", where an inventory would mean "these are installed".
+		assertNull(detector.paramsFor());
+	}
+
+	@Test
+	public void testWhatAStageDoesNotHaveToAskFor() {
+		ParamSpec args = op("skop.ops.workflows.mask.detect_then_mask:detect_then_mask")
+			.param("masker_args");
+		assertNotNull(args.paramsFor());
+		assertEquals("masker", args.paramsFor().chooser());
+		// The workflow supplies the image and the boxes itself, which is what
+		// stops two stages that both take an image from asking for it twice.
+		assertEquals(java.util.Arrays.asList("image", "boxes"),
+			args.paramsFor().binds());
+	}
+
+	@Test
+	public void testAnOrdinaryParamHasNeither() {
+		ParamSpec image = op("skop.ops.threshold:otsu").param("image");
+		assertTrue(image.choices().isEmpty());
+		assertNull(image.paramsFor());
+	}
+
+	// -- one bad op costs only itself ---------------------------------------
+
+	@Test
+	public void testAnUnreadableOpDoesNotCostTheOthers() {
+		// The rule skop's own discovery holds to, held to at the boundary as
+		// well: reading the whole list or nothing is how one new field empties
+		// a menu.
+		Map<String, Object> data = Wire.asMap(Json.parseJson(
+			"{\"package\": \"skop.ops\", \"failures\": [], \"ops\": [" +
+			"{\"name\": \"a:a\", \"module\": \"a\", \"function\": \"a\", " +
+			"\"env\": \"minimal\", \"form\": \"function\", \"params\": [], " +
+			"\"return_type\": {\"name\": \"int\"}, \"outputs\": [\"result\"], " +
+			"\"output_specs\": []}," +
+			"{\"name\": \"b:b\", \"module\": \"b\"}," +
+			"{\"name\": \"c:c\", \"module\": \"c\", \"function\": \"c\", " +
+			"\"env\": \"minimal\", \"form\": \"function\", \"params\": [], " +
+			"\"return_type\": {\"name\": \"int\"}, \"outputs\": [\"result\"], " +
+			"\"output_specs\": []}]}"), "description");
+
+		Description described = Description.fromJson(data);
+
+		assertEquals(2, described.ops().size());
+		assertNotNull(described.op("a:a"));
+		assertNotNull(described.op("c:c"));
+
+		assertEquals(1, described.unreadable().size());
+		Description.ReadFailure failure = described.unreadable().get(0);
+		assertEquals("b:b", failure.name());
+		assertTrue(failure.error().contains("function"), failure.error());
+	}
+
+	@Test
+	public void testTheFixtureIsFullyReadable() {
+		// If this fails, skop has grown something this reader has not learned.
+		assertEquals(java.util.Collections.emptyList(), description.unreadable());
+	}
+
 	// -- the forms --------------------------------------------------------
 
 	@Test

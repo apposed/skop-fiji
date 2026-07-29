@@ -30,6 +30,7 @@ package org.apposed.skop.fiji;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -49,7 +50,12 @@ import net.imglib2.roi.labeling.LabelRegions;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.FloatType;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.apposed.skop.fiji.wire.Description;
+import org.apposed.skop.fiji.wire.OpSpec;
+import org.apposed.skop.fiji.wire.ParamSpec;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -128,11 +134,64 @@ public class SkopServiceTest {
 	// -- registration ------------------------------------------------------
 
 	@Test
-	public void testEveryOpBecameACommand() {
+	public void testEveryRunnableOpBecameACommand() {
 		assertFalse(skop.ops().isEmpty());
-		assertEquals(skop.ops().size(), skop.registeredModules().size());
+		assertEquals(runnable(), skop.registeredModules().size());
 		assertNotNull(module("skop.ops.threshold:otsu"));
 		assertNotNull(module("skop.ops.toy:add"));
+	}
+
+	@Test
+	public void testAWorkflowIsNotRegistered() {
+		// A workflow composes other ops by calling skop.run on them, which
+		// needs a Python runner ambient around it -- and this front end drives
+		// the workers itself, so there is none. Listing one would be listing
+		// something that cannot run.
+		List<OpSpec> workflows = new ArrayList<>();
+		for (OpSpec op : skop.ops()) {
+			if (op.isWorkflow()) workflows.add(op);
+		}
+		assertFalse(workflows.isEmpty(), "the fixture should have workflows");
+		for (OpSpec workflow : workflows) {
+			assertNull(workflow.env(), workflow.name());
+			for (OpModuleInfo info : skop.registeredModules()) {
+				assertNotEquals(workflow.name(), info.op().name(),
+					"a workflow was registered: " + workflow.name());
+			}
+		}
+	}
+
+	@Test
+	public void testAWorkflowsChoosersSurviveTheWire() {
+		// Not rendered yet, but read: whatever eventually draws a workflow
+		// needs the curated op list and the parameters each stage does not
+		// have to ask for.
+		OpSpec workflow = null;
+		for (OpSpec op : skop.ops()) {
+			if (op.name().endsWith(":detect_then_mask")) workflow = op;
+		}
+		assertNotNull(workflow, "detect_then_mask is missing");
+
+		ParamSpec detector = workflow.param("detector");
+		assertFalse(detector.choices().isEmpty());
+		assertTrue(detector.choices().get(0).op().startsWith("skop.ops.detect."),
+			detector.choices().toString());
+
+		ParamSpec args = workflow.param("masker_args");
+		assertNotNull(args.paramsFor());
+		assertEquals("masker", args.paramsFor().chooser());
+		// The workflow supplies these itself, so no stage asks for them twice.
+		assertTrue(args.paramsFor().binds().contains("image"));
+		assertTrue(args.paramsFor().binds().contains("boxes"));
+	}
+
+	/** How many of the described ops are ops this front end can run. */
+	private static int runnable() {
+		int count = 0;
+		for (OpSpec op : skop.ops()) {
+			if (!op.isWorkflow()) count++;
+		}
+		return count;
 	}
 
 	@Test
@@ -154,7 +213,9 @@ public class SkopServiceTest {
 		int before = skop.ops().size();
 		Description again = skop.discoverNow();
 		assertEquals(before, again.ops().size());
-		assertEquals(before, skop.registeredModules().size());
+		assertEquals(runnable(), skop.registeredModules().size());
+		assertTrue(again.unreadable().isEmpty(),
+			"this side is behind skop: " + again.unreadable());
 	}
 
 	// -- running -----------------------------------------------------------

@@ -28,6 +28,7 @@
  */
 package org.apposed.skop.fiji.wire;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -45,11 +46,24 @@ public class ParamSpec {
 	private final Map<String, Object> ui;
 	private final Role role;
 	private final AxesSpec axes;
+	private final List<Choice> choices;
+	private final ParamsFor paramsFor;
 
 	public ParamSpec(String name, TypeSpec type, boolean required,
 		Object defaultValue, Direction direction, Map<String, Object> ui,
 		Role role, AxesSpec axes)
 	{
+		this(name, type, required, defaultValue, direction, ui, role, axes,
+			java.util.Collections.emptyList(), null);
+	}
+
+	public ParamSpec(String name, TypeSpec type, boolean required,
+		Object defaultValue, Direction direction, Map<String, Object> ui,
+		Role role, AxesSpec axes, List<Choice> choices, ParamsFor paramsFor)
+	{
+		this.choices = java.util.Collections.unmodifiableList(
+			new java.util.ArrayList<>(choices));
+		this.paramsFor = paramsFor;
 		this.name = name;
 		this.type = type;
 		this.required = required;
@@ -110,6 +124,90 @@ public class ParamSpec {
 		return axes;
 	}
 
+	/**
+	 * The ops this parameter may be filled with, for a workflow's chooser.
+	 * <p>
+	 * Empty for every ordinary parameter. A curated list rather than an
+	 * inventory: it means "these have been tested together", where an
+	 * inventory would mean only "these are installed".
+	 *
+	 * @return the choices, as label and op ID.
+	 */
+	public List<Choice> choices() {
+		return choices;
+	}
+
+	/**
+	 * The chooser whose settings this parameter holds, or null.
+	 * <p>
+	 * A chooser needs somewhere to put the chosen op's own arguments, and this
+	 * parameter is that somewhere.
+	 */
+	public ParamsFor paramsFor() {
+		return paramsFor;
+	}
+
+	/** One op a chooser offers: what to show, and which op it is. */
+	public static class Choice {
+
+		private final String label;
+		private final String op;
+
+		public Choice(String label, String op) {
+			this.label = label;
+			this.op = op;
+		}
+
+		/** What a menu should show. */
+		public String label() {
+			return label;
+		}
+
+		/** The op's ID, opaque as always. */
+		public String op() {
+			return op;
+		}
+
+		@Override
+		public String toString() {
+			return label + " (" + op + ")";
+		}
+	}
+
+	/** Which chooser a settings parameter belongs to, and what it need not ask. */
+	public static class ParamsFor {
+
+		private final String chooser;
+		private final List<String> binds;
+
+		public ParamsFor(String chooser, List<String> binds) {
+			this.chooser = chooser;
+			this.binds = java.util.Collections.unmodifiableList(
+				new java.util.ArrayList<>(binds));
+		}
+
+		/** Name of the parameter that chooses the op. */
+		public String chooser() {
+			return chooser;
+		}
+
+		/**
+		 * The chosen op's parameters the workflow supplies itself.
+		 * <p>
+		 * A front end renders every <em>other</em> parameter of the chosen op
+		 * and leaves these alone, which is what stops two stages that both take
+		 * an image from asking for it twice.
+		 */
+		public List<String> binds() {
+			return binds;
+		}
+
+		@Override
+		public String toString() {
+			return chooser + " minus " + binds;
+		}
+	}
+
 	/** Whether a user should be asked for this at all. */
 	public boolean harvestable() {
 		// An output buffer is allocated, never asked for.
@@ -134,6 +232,12 @@ public class ParamSpec {
 
 	public static ParamSpec fromJson(Map<String, Object> data) {
 		Map<String, Object> axes = Wire.map(data, "axes");
+		List<Choice> choices = new java.util.ArrayList<>();
+		for (Map<String, Object> choice : Wire.maps(data, "choices")) {
+			choices.add(new Choice(Wire.string(choice, "label"),
+				Wire.string(choice, "op")));
+		}
+		Map<String, Object> paramsFor = Wire.map(data, "params_for");
 		return new ParamSpec(
 			Wire.string(data, "name"),
 			TypeSpec.fromJson(Wire.map(data, "type")),
@@ -142,6 +246,10 @@ public class ParamSpec {
 			Direction.forWire(Wire.optionalString(data, "direction")),
 			Wire.map(data, "ui"),
 			Role.forWire(Wire.optionalString(data, "role")),
-			axes.isEmpty() ? null : AxesSpec.fromJson(axes));
+			axes.isEmpty() ? null : AxesSpec.fromJson(axes),
+			choices,
+			paramsFor.isEmpty() ? null : new ParamsFor(
+				Wire.string(paramsFor, "chooser"),
+				java.util.Arrays.asList(Wire.strings(paramsFor, "binds"))));
 	}
 }

@@ -440,6 +440,122 @@
           }
         }
       ]
+    },
+    {
+      "name": "skop.ops.workflows.mask.detect_then_mask:detect_then_mask",
+      "module": "skop.ops.workflows.mask.detect_then_mask",
+      "function": "detect_then_mask",
+      "env": null,
+      "main_thread": false,
+      "exclusive": false,
+      "form": "function",
+      "doc": "Detect objects and segment each one.\n\nArgs:\n    image: The image to segment.\n    detector: Which op finds the bounding boxes. ``object_aware_yolo`` was\n        trained on microscopy; ``fastsam`` is a general detector.\n    detector_args: Settings for the chosen detector, minus the image.\n    masker: Which op draws a mask inside each box. ``microsam`` is\n        finetuned for microscopy and slower; ``mobilesam`` is the one the\n        object-aware detector was trained to pair with.\n    masker_args: Settings for the chosen mask detector, minus the image\n        and the boxes, which this workflow supplies.\n\nReturns:\n    boxes: the box each mask answers.\n    masks: (N, Y, X) uint8, one object per plane, possibly overlapping.\n\nA detector that finds nothing is an ordinary outcome, not a failure: the\nmask detector is skipped and the result is empty.",
+      "params": [
+        {
+          "name": "image",
+          "type": {
+            "name": "ndarray"
+          },
+          "required": true,
+          "role": "image"
+        },
+        {
+          "name": "detector",
+          "type": {
+            "name": "unknown",
+            "detail": "Callable"
+          },
+          "required": false,
+          "default": null,
+          "choices": [
+            {
+              "label": "object_aware_yolo",
+              "op": "skop.ops.detect.object_aware_yolo:object_aware_yolo"
+            },
+            {
+              "label": "fastsam",
+              "op": "skop.ops.detect.fastsam:fastsam"
+            }
+          ]
+        },
+        {
+          "name": "detector_args",
+          "type": {
+            "name": "unknown",
+            "nullable": true,
+            "detail": "dict"
+          },
+          "required": false,
+          "default": null,
+          "params_for": {
+            "chooser": "detector",
+            "binds": [
+              "image"
+            ]
+          }
+        },
+        {
+          "name": "masker",
+          "type": {
+            "name": "unknown",
+            "detail": "Callable"
+          },
+          "required": false,
+          "default": null,
+          "choices": [
+            {
+              "label": "mobilesam",
+              "op": "skop.ops.mask.mobilesam:mobilesam_masks"
+            },
+            {
+              "label": "microsam",
+              "op": "skop.ops.mask.microsam:microsam_masks"
+            }
+          ]
+        },
+        {
+          "name": "masker_args",
+          "type": {
+            "name": "unknown",
+            "nullable": true,
+            "detail": "dict"
+          },
+          "required": false,
+          "default": null,
+          "params_for": {
+            "chooser": "masker",
+            "binds": [
+              "image",
+              "boxes"
+            ]
+          }
+        }
+      ],
+      "return_type": {
+        "name": "unknown",
+        "detail": "Detected"
+      },
+      "return_role": null,
+      "outputs": [
+        "boxes",
+        "masks"
+      ],
+      "output_specs": [
+        {
+          "name": "boxes",
+          "type": {
+            "name": "ndarray"
+          },
+          "role": "shapes"
+        },
+        {
+          "name": "masks",
+          "type": {
+            "name": "ndarray"
+          },
+          "role": "masks"
+        }
+      ]
     }
   ],
   "failures": [
