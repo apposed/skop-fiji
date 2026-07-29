@@ -130,6 +130,7 @@ public class SkopRunner implements Closeable {
 	private final List<Builder.ProgressConsumer> buildProgress = new ArrayList<>();
 	private final List<Consumer<String>> buildOutput = new ArrayList<>();
 	private final List<Consumer<String>> buildError = new ArrayList<>();
+	private final List<BuildListener> buildListeners = new ArrayList<>();
 
 	private boolean debug;
 	private Map<String, Object> constants;
@@ -192,6 +193,29 @@ public class SkopRunner implements Closeable {
 	 */
 	public SkopRunner subscribeBuildProgress(Builder.ProgressConsumer subscriber) {
 		buildProgress.add(subscriber);
+		return this;
+	}
+
+	/**
+	 * Hears when an environment build begins and ends.
+	 * <p>
+	 * The progress subscriptions say how a build is going; this says
+	 * <em>that</em> one is going, which is what anything with a progress bar
+	 * needs in order to put one up and take it down again. Appose reports
+	 * phases, not a beginning and an end, so these bracket the build here.
+	 * <p>
+	 * Fires once per environment per runner, not once per op: the second op
+	 * to want the same environment finds it in hand and does not wait for
+	 * anything, so there is nothing to put a progress bar up for. The first
+	 * one fires whether or not the environment turns out to be already built
+	 * on disk, because that is not known until it is checked -- so a listener
+	 * that finds itself starting and finishing in the same millisecond should
+	 * say nothing at all.
+	 *
+	 * @param listener called around each build.
+	 */
+	public SkopRunner subscribeBuild(BuildListener listener) {
+		buildListeners.add(listener);
 		return this;
 	}
 
@@ -258,6 +282,24 @@ public class SkopRunner implements Closeable {
 		Environment cached = envs.get(key);
 		if (cached != null) return cached;
 
+		for (BuildListener listener : buildListeners) listener.started(envId);
+		try {
+			Environment built = build(envId, variant);
+			envs.put(key, built);
+			for (BuildListener listener : buildListeners) {
+				listener.finished(envId, null);
+			}
+			return built;
+		}
+		catch (BuildException | RuntimeException exc) {
+			for (BuildListener listener : buildListeners) {
+				listener.finished(envId, exc);
+			}
+			throw exc;
+		}
+	}
+
+	private Environment build(String envId, String variant) throws BuildException {
 		PixiBuilder builder = Appose.pixi(envConfig(envId)).name("skop-" + envId);
 		for (Builder.ProgressConsumer subscriber : buildProgress) {
 			builder = builder.subscribeProgress(subscriber);
@@ -272,9 +314,22 @@ public class SkopRunner implements Closeable {
 
 		Environment env = builder.build();
 		if (variant != null) env = env.activate(variant);
-
-		envs.put(key, env);
 		return env;
+	}
+
+	/** Hears when an environment build begins and ends. */
+	public interface BuildListener {
+
+		/** An environment is about to be built, or confirmed already built. */
+		void started(String envId);
+
+		/**
+		 * A build has ended.
+		 *
+		 * @param envId the environment.
+		 * @param error what went wrong, or null if nothing did.
+		 */
+		void finished(String envId, Exception error);
 	}
 
 	// -- metadata --------------------------------------------------------

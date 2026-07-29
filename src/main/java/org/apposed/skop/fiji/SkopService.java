@@ -82,6 +82,9 @@ public class SkopService extends AbstractService implements SciJavaService {
 	@Parameter(required = false)
 	private StatusService status;
 
+	@Parameter(required = false)
+	private org.scijava.task.TaskService tasks;
+
 	private SkopRunner runner;
 	private Description description;
 	private final List<OpModuleInfo> registered = new ArrayList<>();
@@ -118,10 +121,16 @@ public class SkopService extends AbstractService implements SciJavaService {
 					"No scikit-ops checkout found. Set -Dskop.checkout=<path>, or " +
 						"$SKOP_CHECKOUT, or put one beside this project.");
 			}
+			runner.subscribeBuild(new BuildTasks());
 			runner.subscribeBuildProgress(this::reportBuild);
 			runner.subscribeBuildError(chunk -> log.debug(chunk.trim()));
 		}
 		return runner;
+	}
+
+	/** The task service every run and every build reports through, or null. */
+	public org.scijava.task.TaskService tasks() {
+		return tasks;
 	}
 
 	/** Whether a checkout was found, without demanding one. */
@@ -150,13 +159,20 @@ public class SkopService extends AbstractService implements SciJavaService {
 	public synchronized CompletableFuture<Description> discover() {
 		if (pending != null) return pending;
 		if (description != null) return CompletableFuture.completedFuture(description);
+		// Note: registration happens *inside* the supplied job, not in a
+		// whenComplete on it. whenComplete returns a new stage, so a caller
+		// waiting on this one could be handed the ops a moment before they
+		// were registered -- and find an empty menu, intermittently.
 		pending = CompletableFuture.supplyAsync(() -> {
+			Description found;
 			try {
-				return describe();
+				found = describe();
 			}
 			catch (Exception exc) {
 				throw new IllegalStateException("Could not describe skop's ops", exc);
 			}
+			register(found);
+			return found;
 		});
 		pending.whenComplete((found, error) -> {
 			synchronized (SkopService.this) {
@@ -165,9 +181,7 @@ public class SkopService extends AbstractService implements SciJavaService {
 			if (error != null) {
 				log.error("scikit-ops is not available; no ops were registered.",
 					error);
-				return;
 			}
-			register(found);
 		});
 		return pending;
 	}
@@ -256,9 +270,57 @@ public class SkopService extends AbstractService implements SciJavaService {
 		// and unlike a napari user launched from a terminal, a Fiji user has
 		// nowhere else to look.
 		log.info("scikit-ops: " + title);
+		org.scijava.task.Task task = building.get();
+		if (task != null) {
+			task.setStatusMessage(title);
+			task.setProgressValue(current);
+			task.setProgressMaximum(maximum);
+		}
 		if (status != null) {
 			status.showStatus((int) current, (int) maximum,
 				"Building scikit-ops environment: " + title);
+		}
+	}
+
+	/**
+	 * A SciJava task per environment build, so that a user can see one
+	 * happening and how far along it is.
+	 * <p>
+	 * A build is the one thing here that can take minutes -- a TensorFlow or
+	 * PyTorch stack is a multi-gigabyte download -- and it happens inside an
+	 * op run, with nothing else to show for it. It is also nested inside that
+	 * run's own task, which is why it gets a task of its own rather than
+	 * borrowing one: "Running Otsu" stuck at 0% for four minutes says the
+	 * wrong thing about what is going on.
+	 * <p>
+	 * Note that this is a single slot rather than a map. Appose's progress
+	 * callbacks say nothing about which environment they belong to, so
+	 * attributing them to anything other than the build currently in flight
+	 * would be a guess -- and builds are serialized by
+	 * {@code SkopRunner.environment} anyway.
+	 */
+	private final java.util.concurrent.atomic.AtomicReference<
+		org.scijava.task.Task> building =
+			new java.util.concurrent.atomic.AtomicReference<>();
+
+	private class BuildTasks implements SkopRunner.BuildListener {
+
+		@Override
+		public void started(String envId) {
+			if (tasks == null) return;
+			org.scijava.task.Task task =
+				tasks.createTask("Building scikit-ops environment: " + envId);
+			task.setStatusMessage("Checking " + envId);
+			task.start();
+			building.set(task);
+		}
+
+		@Override
+		public void finished(String envId, Exception error) {
+			org.scijava.task.Task task = building.getAndSet(null);
+			if (task == null) return;
+			if (error != null) task.setStatusMessage("Failed: " + error.getMessage());
+			task.finish();
 		}
 	}
 

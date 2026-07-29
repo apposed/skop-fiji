@@ -38,6 +38,7 @@ import org.apposed.skop.fiji.wire.ParamSpec;
 import org.scijava.Context;
 import org.scijava.MenuPath;
 import org.scijava.module.DefaultMutableModuleInfo;
+import org.scijava.module.DefaultMutableModuleItem;
 import org.scijava.module.Module;
 import org.scijava.module.ModuleException;
 import org.scijava.module.MutableModuleItem;
@@ -109,13 +110,7 @@ public class OpModuleInfo extends DefaultMutableModuleInfo {
 		// Note: the inherited implementation calls a no-argument constructor,
 		// which cannot work here -- one class serves every op, so an instance
 		// is useless without knowing which one it is.
-		//
-		// The module also gets an info of its own rather than this one, because
-		// the axis-mapping items depend on the image *this* run was given: two
-		// people thresholding two differently shaped stacks at the same time
-		// must not be editing the same list of items. This is the same move
-		// DynamicCommand makes, for the same reason.
-		return new OpModule(new OpModuleInfo(context, op));
+		return new OpModule(this);
 	}
 
 	@Override
@@ -167,11 +162,46 @@ public class OpModuleInfo extends DefaultMutableModuleInfo {
 				continue;
 			}
 			addInput(item);
+			if (param.axes() != null) addInput(axisItem(param));
 		}
 
 		for (OutputSpec output : op.outputSpecs()) {
 			addOutput(Params.output(this, output));
 		}
+	}
+
+	/**
+	 * The field that says what becomes of each of an image's axes.
+	 * <p>
+	 * One static item rather than a widget per axis, because the input
+	 * harvester builds its panel once and a combo that changes which
+	 * <em>other</em> widgets ought to exist cannot bring them into being. It
+	 * is also the whole decision in one string, which is what a recorded macro
+	 * wants. {@link AxisPreprocessor} fills it with skop's own answer before
+	 * the dialog is drawn, so it opens showing what would have happened
+	 * anyway; left blank, that is exactly what does happen.
+	 *
+	 * @param param the image parameter it belongs to.
+	 * @return the item.
+	 */
+	private MutableModuleItem<String> axisItem(ParamSpec param) {
+		DefaultMutableModuleItem<String> item = new DefaultMutableModuleItem<>(
+			this, axisItemName(param.name()), String.class);
+		item.setIOType(org.scijava.ItemIO.INPUT);
+		item.setLabel(Params.label(param.name()) + " axes");
+		item.setDescription(AxisSpec.SYNTAX);
+		item.setRequired(false);
+		item.setPersisted(false);
+		// Note: a default rather than a value. A value belongs to a module, and
+		// this item belongs to every run of the op; the preprocessor is what
+		// gives one particular run its starting text.
+		item.setDefaultValue("");
+		return item;
+	}
+
+	/** The name of the axis-mapping item for an image parameter. */
+	public static String axisItemName(String param) {
+		return "axes." + param;
 	}
 
 	/**

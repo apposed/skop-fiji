@@ -78,10 +78,12 @@ public class OpModule extends AbstractModule implements Cancelable {
 	private final DatasetService datasets;
 	private final StatusService status;
 	private final LogService log;
+	private final org.scijava.task.TaskService tasks;
 
 	private volatile Service.Task task;
 	private volatile String cancelReason;
 	private volatile Exception failure;
+	private volatile org.scijava.task.Task progress;
 
 	public OpModule(OpModuleInfo info) {
 		this.info = info;
@@ -89,6 +91,7 @@ public class OpModule extends AbstractModule implements Cancelable {
 		this.datasets = info.context().getService(DatasetService.class);
 		this.status = info.context().getService(StatusService.class);
 		this.log = info.context().getService(LogService.class);
+		this.tasks = info.context().getService(org.scijava.task.TaskService.class);
 	}
 
 	// -- Module methods --
@@ -115,6 +118,7 @@ public class OpModule extends AbstractModule implements Cancelable {
 		}
 
 		List<NDArray> allocated = new ArrayList<>();
+		progress = startTask(op);
 		try {
 			Map<String, Object> args = new LinkedHashMap<>();
 			Map<String, List<String>> axes = new LinkedHashMap<>();
@@ -136,6 +140,10 @@ public class OpModule extends AbstractModule implements Cancelable {
 		}
 		finally {
 			task = null;
+			if (progress != null) {
+				progress.finish();
+				progress = null;
+			}
 			// Inputs we allocated are ours to release; outputs are not, and
 			// are deliberately left alive. See Images.adopt.
 			for (NDArray array : allocated) {
@@ -269,14 +277,18 @@ public class OpModule extends AbstractModule implements Cancelable {
 			if (param == null || param.axes() == null) continue;
 			NDArray array = (NDArray) args.get(entry.getKey());
 			List<String> labels = entry.getValue();
-			// What the user chose, if they were offered the choice at all.
-			// Absent everywhere, this is exactly skop's own default plan.
-			AdaptationPlan plan = skop.runner().plan(op.name(), entry.getKey(),
-				Axes.numpyShape(array), labels,
-				AxisMapping.positions(this, entry.getKey(), labels),
-				AxisMapping.mapping(this, entry.getKey(),
-					param.axes().slots().size(), labels),
-				AxisMapping.dispositions(this, entry.getKey(), labels));
+			List<Integer> shape = Axes.numpyShape(array);
+			// What the user asked for, if they asked for anything. A blank
+			// field is exactly skop's own default plan.
+			Object spec = getInput(OpModuleInfo.axisItemName(param.name()));
+			AxisSpec.Request request = AxisSpec.parse(
+				spec == null ? null : String.valueOf(spec), param.axes(), labels,
+				shape);
+
+			AdaptationPlan plan = request == null
+				? skop.runner().plan(op.name(), entry.getKey(), shape, labels)
+				: skop.runner().plan(op.name(), entry.getKey(), shape, labels,
+					request.positions(), request.mapping(), request.dispositions());
 			for (String warning : plan.warnings()) {
 				log.warn(op.name() + ": " + warning);
 			}
@@ -351,9 +363,45 @@ public class OpModule extends AbstractModule implements Cancelable {
 			: base + " (" + output.name() + ")";
 	}
 
+	/**
+	 * A SciJava task for this run, so that it appears wherever running things
+	 * appear -- the status bar, the task list -- and can be stopped from there.
+	 * <p>
+	 * Its cancel callback is this module's own {@link #cancel(String)}, so the
+	 * button in the task widget and the Cancel in a dialog do the same thing:
+	 * ask the Appose task to stop, which {@code skop.cancel_requested()} reads
+	 * on the far side.
+	 */
+	private org.scijava.task.Task startTask(OpSpec op) {
+		if (tasks == null) return null;
+		org.scijava.task.Task created =
+			tasks.createTask(getInfo().getTitle() + " (" + op.env() + ")");
+		created.setCancelCallBack(() -> cancel("Canceled"));
+		created.setStatusMessage("Starting " + op.name());
+		created.start();
+		return created;
+	}
+
+	/**
+	 * Passes a worker's progress on, to everything that shows progress.
+	 * <p>
+	 * skop's own progress vocabulary is (message, current, maximum), which is
+	 * what an iterated op reports per slice and what any op may report from
+	 * inside itself. It reaches the task -- and so the task list and the
+	 * status bar -- unchanged.
+	 */
 	private void report(org.apposed.appose.TaskEvent event) {
-		if (status == null || event.message == null) return;
-		status.showStatus((int) event.current, (int) event.maximum, event.message);
+		if (event.message == null) return;
+		org.scijava.task.Task running = progress;
+		if (running != null) {
+			running.setStatusMessage(event.message);
+			running.setProgressValue(event.current);
+			running.setProgressMaximum(event.maximum);
+		}
+		if (status != null) {
+			status.showStatus((int) event.current, (int) event.maximum,
+				event.message);
+		}
 	}
 
 	private void fail(OpSpec op, Exception exc) {

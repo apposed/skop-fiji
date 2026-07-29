@@ -28,6 +28,7 @@
  */
 package org.apposed.skop.fiji;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import net.imagej.Dataset;
@@ -37,7 +38,6 @@ import org.apposed.skop.fiji.wire.OpSpec;
 import org.apposed.skop.fiji.wire.ParamSpec;
 import org.scijava.log.LogService;
 import org.scijava.module.Module;
-import org.scijava.module.ModuleItem;
 import org.scijava.module.process.AbstractPreprocessorPlugin;
 import org.scijava.module.process.PreprocessorPlugin;
 import org.scijava.plugin.Parameter;
@@ -45,25 +45,24 @@ import org.scijava.plugin.Plugin;
 import org.scijava.widget.InputHarvester;
 
 /**
- * Builds the axis-mapping widgets, just before the dialog is drawn.
+ * Fills in the axis mapping skop would have chosen, before the dialog opens.
  * <p>
- * The mapping items cannot be built when an op is registered, because they
- * depend on the shape and axes of an image nobody has chosen yet. The spec's
- * first suggestion was a callback on the image parameter that adds them once a
- * {@code Dataset} is selected; that fights the input harvester, which has
- * already drawn its panel by then.
+ * The field is there whether or not this runs -- blank means skop's own plan,
+ * which is what every run got before any of this existed. What this adds is
+ * making the default <em>visible</em>: a dialog that opens showing
+ * {@code "x y z!"} has told a user what is about to happen, what the syntax
+ * looks like, and where to intervene, all without asking them anything.
  * <p>
- * A preprocessor does not. By the time preprocessing reaches
- * {@link InputHarvester#PRIORITY}, ImageJ's own
- * {@code ActiveImagePreprocessor} has already filled a single image parameter
- * from the active display -- so the image is known, its axes are known, and
- * this can ask skop what it would do and lay that out as widgets. One dialog,
- * drawn once, showing the default and inviting an argument with it.
+ * It has to be a preprocessor rather than a callback on the image parameter,
+ * because the answer depends on the shape and axes of an image that is not
+ * chosen when the op is registered. By {@link InputHarvester#PRIORITY},
+ * imagej-common's {@code ActiveImagePreprocessor} has already filled a single
+ * image parameter from the active display, so the axes are known before the
+ * panel exists.
  * <p>
  * When there is no image to inspect -- nothing open, or several image
- * parameters and no way to guess -- no items are added and the op runs on
- * skop's default plan, which is exactly what it did before any of this
- * existed. The feature degrades to the fallback rather than to an error.
+ * parameters and no way to guess -- the field is simply left blank and the op
+ * runs on skop's default. Nothing here is ever required for a run to work.
  *
  * @author Curtis Rueden
  */
@@ -79,36 +78,39 @@ public class AxisPreprocessor extends AbstractPreprocessorPlugin {
 	@Override
 	public void process(Module module) {
 		if (skop == null || !(module instanceof OpModule)) return;
-		OpModule op = (OpModule) module;
-		if (!(op.getInfo() instanceof OpModuleInfo)) return;
-		OpModuleInfo info = (OpModuleInfo) op.getInfo();
-		OpSpec spec = info.op();
+		if (!(module.getInfo() instanceof OpModuleInfo)) return;
+		OpSpec spec = ((OpModuleInfo) module.getInfo()).op();
 
 		for (ParamSpec param : spec.params()) {
 			if (!param.harvestable() || param.axes() == null) continue;
+			String name = OpModuleInfo.axisItemName(param.name());
+			Object current = module.getInput(name);
+			// Anything already there is a user's, or a macro's, and stays.
+			if (current != null && !String.valueOf(current).trim().isEmpty()) continue;
+
 			Dataset image = resolvedImage(module, param.name());
 			if (image == null) continue;
 			try {
-				addItems(info, spec, param, image);
+				module.setInput(name, defaultSpec(spec, param, image));
 			}
 			catch (Exception exc) {
-				// Never block a run over the widgets that were only going to
-				// offer a choice: without them, skop's default still applies.
+				// A default nobody could compute is a blank field, which still
+				// runs. Never block a dialog over a convenience.
 				if (log != null) {
-					log.debug("Could not build axis widgets for " + spec.name(), exc);
+					log.debug("Could not describe the default axis mapping for " +
+						spec.name(), exc);
 				}
 			}
 		}
 	}
 
-	private void addItems(OpModuleInfo info, OpSpec spec, ParamSpec param,
-		Dataset image) throws Exception
+	private String defaultSpec(OpSpec spec, ParamSpec param, Dataset image)
+		throws Exception
 	{
 		List<String> labels = Axes.numpyLabelsOf(image);
-		List<Integer> shape = numpyShape(image);
-		AdaptationPlan plan =
-			skop.runner().plan(spec.name(), param.name(), shape, labels);
-		AxisMapping.addItems(info, param, labels, shape, plan);
+		AdaptationPlan plan = skop.runner().plan(spec.name(), param.name(),
+			numpyShape(image), labels);
+		return AxisSpec.format(plan, param.axes());
 	}
 
 	/**
@@ -116,17 +118,16 @@ public class AxisPreprocessor extends AbstractPreprocessorPlugin {
 	 * <p>
 	 * Deliberately does not resolve anything itself: an image the user has not
 	 * chosen yet is an image whose axes are not known yet, and inventing one
-	 * would produce a dialog about the wrong picture.
+	 * would describe the wrong picture.
 	 */
 	private static Dataset resolvedImage(Module module, String name) {
-		ModuleItem<?> item = module.getInfo().getInput(name);
-		if (item == null) return null;
+		if (module.getInfo().getInput(name) == null) return null;
 		Object value = module.getInput(name);
 		return value instanceof Dataset ? (Dataset) value : null;
 	}
 
 	private static List<Integer> numpyShape(Dataset image) {
-		List<Integer> shape = new java.util.ArrayList<>(image.numDimensions());
+		List<Integer> shape = new ArrayList<>(image.numDimensions());
 		// ImgLib2 is x-fastest and numpy is last-fastest, so this reverses.
 		for (int d = image.numDimensions() - 1; d >= 0; d--) {
 			shape.add((int) image.dimension(d));

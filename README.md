@@ -47,8 +47,8 @@ Labelings.java      label array <-> ImgLabeling, over the worker's own block
 Rois.java           boxes, points and masks <-> ROIs; coordinates reverse here too
 Tables.java         an (N, C) array -> a Table
 Docs.java           a Google-style docstring -> the text a dialog shows
-AxisMapping.java    the per-axis decisions, as widgets
-AxisPreprocessor    builds them, just before the dialog is drawn
+AxisSpec.java       the per-axis decisions, as one line of text
+AxisPreprocessor    fills in the line skop would have written, before the dialog opens
 Axes.java           ImgLib2 axis labels -> skop's; the order flip lives here
 SkopRunner.java     a port of skop's runner.py: build, one service per environment, invoke
 wire/               reading the JSON skop sends
@@ -68,11 +68,23 @@ is what makes the boundary testable without a running Fiji.
   choice lists for enums.
 - **2-D ops that work on stacks, and an argument with how.** An `ImgPlus`
   says what its axes are, so they are read, handed to `skop.plan`, and a
-  strictly 2-D op is iterated over a stack. The dialog then shows that
-  decision and lets you change it: which of the image's axes fills each slot
-  the op consumes, and for each axis left over, whether to iterate it, take a
-  single position, or hand it through whole. The default is what skop would
-  have done unasked, and it never discards data.
+  strictly 2-D op is iterated over a stack. The dialog shows that decision as
+  one line of text and lets you rewrite it:
+
+  ```
+  x y z=27 c t!
+  ```
+
+  One token per axis, in the order Fiji lists them. A slot name feeds that
+  axis to the op; `z!` iterates over it; `z=27` runs at one position; `z+`
+  hands it to a variadic op whole. Blank means scikit-ops' own choice, which
+  is what the field opens showing and never discards data.
+- **Progress and cancellation that reach the usual places.** A run is a
+  SciJava `Task`, so it appears in the status bar and the task list with
+  whatever the op says about itself -- "Slice 3 of 8" while a 2-D op walks a
+  stack -- and Stop there reaches the worker. An environment build gets a task
+  of its own, because a first run of a PyTorch stack is minutes long and
+  "Running Otsu" stuck at 0% says the wrong thing about it.
 - **A stable macro identifier**, `skop:skop.ops.threshold:otsu`.
 - **Failures that say what happened.** A worker's traceback reaches the log
   whole. A script can tell a failure from a user-pressed Cancel with
@@ -81,10 +93,13 @@ is what makes the boundary testable without a running Fiji.
 ## What it does not do yet
 
 - No environment manager, no update site.
-- The mapping widgets need an image already in the parameter when the dialog
-  opens, which ImageJ's `ActiveImagePreprocessor` handles for the usual case
-  of one image parameter and an open image. Without one, the op still runs on
-  skop's default plan.
+- The axis line is pre-filled only when an image is already in the parameter
+  as the dialog opens, which ImageJ's `ActiveImagePreprocessor` handles for
+  the usual case of one image parameter and an open image. Without one the
+  field starts blank, which still means skop's default.
+- Changing the image in an open dialog does not re-fill the line, because the
+  input harvester builds its panel once. The line is checked against the image
+  at run time, so a mismatch is refused rather than misapplied.
 - `vectors` and `surface` still fall back to `Dataset` -- lossless, but not
   an Overlay of arrows or a mesh. No op produces either yet.
 - A result's shared memory is deliberately never released. See

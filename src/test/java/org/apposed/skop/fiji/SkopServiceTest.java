@@ -54,8 +54,6 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.scijava.Context;
-import org.scijava.log.LogLevel;
-import org.scijava.log.LogService;
 import org.scijava.module.Module;
 import org.scijava.module.ModuleInfo;
 import org.scijava.module.ModuleService;
@@ -360,28 +358,15 @@ public class SkopServiceTest {
 		Dataset flat = image("flat", new long[] { 16, 16 },
 			new AxisType[] { Axes.X, Axes.Y }, 7);
 
-		Module module;
-		// The module logs the whole Python traceback, which is exactly what it
-		// is supposed to do and exactly what nobody wants to read in the
-		// middle of a passing test run. Silenced here and only here, so that
-		// an ERROR appearing during these tests still means something.
-		LogService log = context.getService(LogService.class);
-		int level = log.getLevel();
-		log.setLevel(LogLevel.NONE);
-		try {
-			module = run("skop.ops.threshold:minimum", "image", flat);
-		}
-		finally {
-			log.setLevel(level);
-		}
-		OpModule op = (OpModule) module;
+		OpModule op = (OpModule) Quiet.run(context, () ->
+			run("skop.ops.threshold:minimum", "image", flat));
 
 		assertTrue(op.isCanceled(), "the failure should have been recorded");
 		assertTrue(op.getCancelReason().contains("minimum"), op.getCancelReason());
 		assertTrue(op.getCancelReason().contains("two maxima"),
 			"the reason should carry what the far side actually said: " +
 				op.getCancelReason());
-		assertNull(module.getOutput("result"));
+		assertNull(op.getOutput("result"));
 
 		// And a failure is tellable from a cancellation, which the Cancelable
 		// interface alone cannot say.

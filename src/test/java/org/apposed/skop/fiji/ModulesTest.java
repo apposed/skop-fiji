@@ -31,7 +31,7 @@ package org.apposed.skop.fiji;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -262,28 +262,15 @@ public class ModulesTest {
 	}
 
 	@Test
-	public void testAModuleGetsAnInfoOfItsOwn() throws Exception {
-		// Not the registered one: the axis-mapping items depend on the image
-		// this run was given, so two runs must not share a list of items. What
-		// has to survive the copy is the identity -- the menu path a user
-		// clicked and the string a macro recorded.
-		OpModuleInfo registered = info("skop.ops.toy:add");
-		org.scijava.module.Module module = registered.createModule();
+	public void testAModuleKnowsItsOwnInfo() throws Exception {
+		// The registered one, shared by every run, as an ordinary SciJava
+		// command's is. Nothing mutates it: the axis mapping is one static text
+		// field whose *value* a run sets, not a list of items a run builds.
+		OpModuleInfo info = info("skop.ops.toy:add");
+		org.scijava.module.Module module = info.createModule();
 
 		assertTrue(module instanceof OpModule);
-		assertNotSame(registered, module.getInfo());
-		assertEquals(registered.getIdentifier(), module.getInfo().getIdentifier());
-		assertEquals(registered.getMenuPath().getMenuString(),
-			((OpModuleInfo) module.getInfo()).getMenuPath().getMenuString());
-		assertEquals(registered.op().name(),
-			((OpModuleInfo) module.getInfo()).op().name());
-	}
-
-	@Test
-	public void testTwoModulesDoNotShareItems() throws Exception {
-		OpModuleInfo registered = info("skop.ops.toy:add");
-		assertNotSame(registered.createModule().getInfo(),
-			registered.createModule().getInfo());
+		assertSame(info, module.getInfo());
 	}
 
 	// -- the cache round trip ----------------------------------------------
