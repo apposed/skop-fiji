@@ -9,7 +9,6 @@
       "main_thread": false,
       "exclusive": false,
       "form": "function",
-      "doc": "Grow bright regions, by taking the maximum under the footprint.\n\nThe dual of :func:`erosion`: bright objects gain a border of ``radius``,\nand gaps narrower than the footprint close up. The usual use is joining a\nstructure that noise or thresholding has broken into pieces.\n\nArgs:\n    image: Image to dilate. Any number of axes; a trailing RGB(A) axis is\n        dilated channel by channel.\n    radius: Radius of the footprint, in pixels.\n    shape: Shape of the footprint.\n\nReturns:\n    The dilated image, in the input's dtype.",
       "params": [
         {
           "name": "image",
@@ -60,9 +59,6 @@
       },
       "return_role": "image",
       "outputs": [
-        "result"
-      ],
-      "output_specs": [
         {
           "name": "result",
           "type": {
@@ -70,7 +66,8 @@
           },
           "role": "image"
         }
-      ]
+      ],
+      "doc": "Grow bright regions, by taking the maximum under the footprint.\n\nThe dual of :func:`erosion`: bright objects gain a border of ``radius``,\nand gaps narrower than the footprint close up. The usual use is joining a\nstructure that noise or thresholding has broken into pieces.\n\nArgs:\n    image: Image to dilate. Any number of axes; a trailing RGB(A) axis is\n        dilated channel by channel.\n    radius: Radius of the footprint, in pixels.\n    shape: Shape of the footprint.\n\nReturns:\n    The dilated image, in the input's dtype."
     },
     {
       "name": "skop.ops.threshold:otsu",
@@ -80,7 +77,6 @@
       "main_thread": false,
       "exclusive": false,
       "form": "function",
-      "doc": "Threshold an image by Otsu's method.\n\nChooses the threshold that minimizes the variance within the two classes\nit creates, which is the same as maximizing the variance between them.\nThe standard first thing to try, and what it assumes -- two comparably\nsized modes -- is also what it fails on.\n\nArgs:\n    image: Image to threshold. A trailing RGB(A) axis is collapsed.\n    invert: Whether to keep what falls below the threshold instead.\n    label_objects: Whether to label connected components, rather than\n        returning a plain binary mask.\n\nReturns:\n    A label image, or a 0/1 mask when ``label_objects`` is off.",
       "params": [
         {
           "name": "image",
@@ -116,9 +112,6 @@
       },
       "return_role": "labels",
       "outputs": [
-        "result"
-      ],
-      "output_specs": [
         {
           "name": "result",
           "type": {
@@ -126,7 +119,8 @@
           },
           "role": "labels"
         }
-      ]
+      ],
+      "doc": "Threshold an image by Otsu's method.\n\nChooses the threshold that minimizes the variance within the two classes\nit creates, which is the same as maximizing the variance between them.\nThe standard first thing to try, and what it assumes -- two comparably\nsized modes -- is also what it fails on.\n\nArgs:\n    image: Image to threshold. A trailing RGB(A) axis is collapsed.\n    invert: Whether to keep what falls below the threshold instead.\n    label_objects: Whether to label connected components, rather than\n        returning a plain binary mask.\n\nReturns:\n    A label image, or a 0/1 mask when ``label_objects`` is off."
     },
     {
       "name": "skop.ops.toy:add",
@@ -136,7 +130,6 @@
       "main_thread": false,
       "exclusive": false,
       "form": "function",
-      "doc": "Add two numbers. The smallest op there is.",
       "params": [
         {
           "name": "a",
@@ -158,16 +151,14 @@
       },
       "return_role": null,
       "outputs": [
-        "result"
-      ],
-      "output_specs": [
         {
           "name": "result",
           "type": {
             "name": "int"
           }
         }
-      ]
+      ],
+      "doc": "Add two numbers. The smallest op there is."
     },
     {
       "name": "skop.ops.toy:find_nothing",
@@ -177,7 +168,6 @@
       "main_thread": false,
       "exclusive": false,
       "form": "function",
-      "doc": "Return an empty result, as a segmentation that finds nothing would.",
       "params": [
         {
           "name": "image",
@@ -194,10 +184,6 @@
       },
       "return_role": null,
       "outputs": [
-        "labels",
-        "points"
-      ],
-      "output_specs": [
         {
           "name": "labels",
           "type": {
@@ -212,7 +198,8 @@
           },
           "role": "points"
         }
-      ]
+      ],
+      "doc": "Return an empty result, as a segmentation that finds nothing would."
     },
     {
       "name": "skop.ops.toy:probe",
@@ -222,23 +209,20 @@
       "main_thread": false,
       "exclusive": false,
       "form": "function",
-      "doc": "Report which interpreter is actually executing this op.",
       "params": [],
       "return_type": {
         "name": "str"
       },
       "return_role": null,
       "outputs": [
-        "result"
-      ],
-      "output_specs": [
         {
           "name": "result",
           "type": {
             "name": "str"
           }
         }
-      ]
+      ],
+      "doc": "Report which interpreter is actually executing this op."
     },
     {
       "name": "skop.ops.toy:quadrants",
@@ -248,7 +232,6 @@
       "main_thread": false,
       "exclusive": false,
       "form": "function",
-      "doc": "Label a plane's four quadrants, 1 through 4.\n\nA strictly 2-D op, and the standing test case for adapting one: fed a\nstack, every plane numbers its own objects from 1, so a correct\nreassembly has to renumber them.",
       "params": [
         {
           "name": "image",
@@ -277,9 +260,6 @@
       },
       "return_role": "labels",
       "outputs": [
-        "result"
-      ],
-      "output_specs": [
         {
           "name": "result",
           "type": {
@@ -287,7 +267,8 @@
           },
           "role": "labels"
         }
-      ]
+      ],
+      "doc": "Label a plane's four quadrants, 1 through 4.\n\nA strictly 2-D op, and the standing test case for adapting one: fed a\nstack, every plane numbers its own objects from 1, so a correct\nreassembly has to renumber them."
     },
     {
       "name": "skop.ops.toy:scale",
@@ -297,7 +278,6 @@
       "main_thread": false,
       "exclusive": false,
       "form": "function",
-      "doc": "Scale an array, returning the result alongside its sum.\n\nExercises multi-output ops: the NamedTuple field names become the names\nof the task's outputs.",
       "params": [
         {
           "name": "image",
@@ -327,10 +307,6 @@
       },
       "return_role": null,
       "outputs": [
-        "scaled",
-        "total"
-      ],
-      "output_specs": [
         {
           "name": "scaled",
           "type": {
@@ -343,7 +319,8 @@
             "name": "float"
           }
         }
-      ]
+      ],
+      "doc": "Scale an array, returning the result alongside its sum.\n\nExercises multi-output ops: the NamedTuple field names become the names\nof the task's outputs."
     },
     {
       "name": "skop.ops.toy:scale_into",
@@ -353,7 +330,6 @@
       "main_thread": false,
       "exclusive": false,
       "form": "computer",
-      "doc": "Computer form: fill a buffer the caller allocated.\n\nThe caller owns ``result``, so nothing is sent back over the wire. Note\nthat ``Out`` and a role compose: nested Annotated flattens, so ``result``\nis both an output buffer and an image.",
       "params": [
         {
           "name": "image",
@@ -369,8 +345,8 @@
             "name": "ndarray"
           },
           "required": true,
-          "direction": "Out",
-          "role": "image"
+          "role": "image",
+          "direction": "Out"
         },
         {
           "name": "factor",
@@ -387,9 +363,6 @@
       },
       "return_role": null,
       "outputs": [
-        "result"
-      ],
-      "output_specs": [
         {
           "name": "result",
           "type": {
@@ -397,7 +370,8 @@
           },
           "role": "image"
         }
-      ]
+      ],
+      "doc": "Computer form: fill a buffer the caller allocated.\n\nThe caller owns ``result``, so nothing is sent back over the wire. Note\nthat ``Out`` and a role compose: nested Annotated flattens, so ``result``\nis both an output buffer and an image."
     },
     {
       "name": "skop.ops.toy:slow_sum",
@@ -407,7 +381,6 @@
       "main_thread": false,
       "exclusive": false,
       "form": "function",
-      "doc": "Sum an array slowly, reporting progress and honoring cancellation.",
       "params": [
         {
           "name": "image",
@@ -430,16 +403,14 @@
       },
       "return_role": null,
       "outputs": [
-        "result"
-      ],
-      "output_specs": [
         {
           "name": "result",
           "type": {
             "name": "float"
           }
         }
-      ]
+      ],
+      "doc": "Sum an array slowly, reporting progress and honoring cancellation."
     },
     {
       "name": "skop.ops.workflows.mask.detect_then_mask:detect_then_mask",
@@ -449,7 +420,6 @@
       "main_thread": false,
       "exclusive": false,
       "form": "function",
-      "doc": "Detect objects and segment each one.\n\nArgs:\n    image: The image to segment.\n    detector: Which op finds the bounding boxes. ``object_aware_yolo`` was\n        trained on microscopy; ``fastsam`` is a general detector.\n    detector_args: Settings for the chosen detector, minus the image.\n    masker: Which op draws a mask inside each box. ``microsam`` is\n        finetuned for microscopy and slower; ``mobilesam`` is the one the\n        object-aware detector was trained to pair with.\n    masker_args: Settings for the chosen mask detector, minus the image\n        and the boxes, which this workflow supplies.\n\nReturns:\n    boxes: the box each mask answers.\n    masks: (N, Y, X) uint8, one object per plane, possibly overlapping.\n\nA detector that finds nothing is an ordinary outcome, not a failure: the\nmask detector is skipped and the result is empty.",
       "params": [
         {
           "name": "image",
@@ -537,16 +507,12 @@
       },
       "return_role": null,
       "outputs": [
-        "boxes",
-        "masks"
-      ],
-      "output_specs": [
         {
           "name": "boxes",
           "type": {
             "name": "ndarray"
           },
-          "role": "shapes"
+          "role": "boxes"
         },
         {
           "name": "masks",
@@ -555,7 +521,8 @@
           },
           "role": "masks"
         }
-      ]
+      ],
+      "doc": "Detect objects and segment each one.\n\nArgs:\n    image: The image to segment.\n    detector: Which op finds the bounding boxes. ``object_aware_yolo`` was\n        trained on microscopy; ``fastsam`` is a general detector.\n    detector_args: Settings for the chosen detector, minus the image.\n    masker: Which op draws a mask inside each box. ``microsam`` is\n        finetuned for microscopy and slower; ``mobilesam`` is the one the\n        object-aware detector was trained to pair with.\n    masker_args: Settings for the chosen mask detector, minus the image\n        and the boxes, which this workflow supplies.\n\nReturns:\n    boxes: the box each mask answers.\n    masks: (N, Y, X) uint8, one object per plane, possibly overlapping.\n\nA detector that finds nothing is an ordinary outcome, not a failure: the\nmask detector is skipped and the result is empty."
     }
   ],
   "failures": [

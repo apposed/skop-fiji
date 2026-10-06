@@ -242,9 +242,14 @@ public class OpSpec {
 		for (Map<String, Object> param : Wire.maps(data, "params")) {
 			params.add(ParamSpec.fromJson(param));
 		}
+		// Each output arrives whole -- name, type and role -- under "outputs"
+		// (opspec 0003, K5); the names are read off those.
 		List<OutputSpec> outputSpecs = new ArrayList<>();
-		for (Map<String, Object> output : Wire.maps(data, "output_specs")) {
-			outputSpecs.add(OutputSpec.fromJson(output));
+		List<String> outputs = new ArrayList<>();
+		for (Map<String, Object> output : Wire.maps(data, "outputs")) {
+			OutputSpec spec = OutputSpec.fromJson(output);
+			outputSpecs.add(spec);
+			outputs.add(spec.name());
 		}
 		return new OpSpec(
 			Wire.string(data, "name"),
@@ -258,7 +263,7 @@ public class OpSpec {
 			params,
 			TypeSpec.fromJson(Wire.map(data, "return_type")),
 			Role.forWire(Wire.optionalString(data, "return_role")),
-			java.util.Arrays.asList(Wire.strings(data, "outputs")),
+			outputs,
 			outputSpecs,
 			data);
 	}

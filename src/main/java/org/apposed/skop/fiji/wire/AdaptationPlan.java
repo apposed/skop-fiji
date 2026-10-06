@@ -70,14 +70,14 @@ public class AdaptationPlan {
 	private final int[] transpose;
 	private final List<String> outputAxes;
 	private final int calls;
-	private final boolean lossless;
+	private final boolean usesAllData;
 	private final List<String> warnings;
 	private final String summary;
 	private final Map<String, Object> raw;
 
 	private AdaptationPlan(String param, List<String> inputAxes, Integer[] mapping,
 		int[][] select, int[] iterate, int[] passed, int[] transpose,
-		List<String> outputAxes, int calls, boolean lossless,
+		List<String> outputAxes, int calls, boolean usesAllData,
 		List<String> warnings, String summary, Map<String, Object> raw)
 	{
 		this.param = param;
@@ -89,7 +89,7 @@ public class AdaptationPlan {
 		this.transpose = transpose;
 		this.outputAxes = Collections.unmodifiableList(new ArrayList<>(outputAxes));
 		this.calls = calls;
-		this.lossless = lossless;
+		this.usesAllData = usesAllData;
 		this.warnings = Collections.unmodifiableList(new ArrayList<>(warnings));
 		this.summary = summary;
 		this.raw = raw;
@@ -146,8 +146,8 @@ public class AdaptationPlan {
 	}
 
 	/** Whether the plan feeds the op every voxel it was given. */
-	public boolean lossless() {
-		return lossless;
+	public boolean usesAllData() {
+		return usesAllData;
 	}
 
 	/**
@@ -202,7 +202,7 @@ public class AdaptationPlan {
 			Wire.ints(data, "transpose"),
 			Arrays.asList(Wire.strings(data, "output_axes")),
 			Wire.integer(data, "calls", 1),
-			Wire.bool(data, "lossless", true),
+			Wire.bool(data, "uses_all_data", true),
 			Arrays.asList(Wire.strings(data, "warnings")),
 			Wire.string(data, "summary"),
 			Collections.unmodifiableMap(new LinkedHashMap<>(data)));

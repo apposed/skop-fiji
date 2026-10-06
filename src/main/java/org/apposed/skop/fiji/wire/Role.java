@@ -44,6 +44,7 @@ package org.apposed.skop.fiji.wire;
  */
 public enum Role {
 
+	BOXES("boxes"),
 	IMAGE("image"),
 	LABELS("labels"),
 	MASKS("masks"),

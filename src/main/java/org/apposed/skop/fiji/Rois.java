@@ -82,12 +82,16 @@ public final class Rois {
 	 * ROIs for an array, read according to what skop said it means.
 	 *
 	 * @param array the result array.
-	 * @param role {@code shapes}, {@code points} or {@code masks}.
+	 * @param role {@code boxes}, {@code shapes}, {@code points} or {@code masks}.
 	 * @return the ROIs.
 	 * @throws IllegalArgumentException if the role is not one this can read.
 	 */
 	public static ROITree toRois(NDArray array, Role role) {
 		switch (role) {
+			case BOXES: return tree(boxes(array));
+			// Freeform shapes have no reader here yet, and no op makes them; an
+			// older skop also said "shapes" where it meant boxes. So read them
+			// as boxes until a freeform reader exists.
 			case SHAPES: return tree(boxes(array));
 			case POINTS: return tree(points(array));
 			case MASKS: return tree(masks(array));

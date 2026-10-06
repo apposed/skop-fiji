@@ -223,13 +223,13 @@ public class WireTest {
 			"{\"package\": \"skop.ops\", \"failures\": [], \"ops\": [" +
 			"{\"name\": \"a:a\", \"module\": \"a\", \"function\": \"a\", " +
 			"\"env\": \"minimal\", \"form\": \"function\", \"params\": [], " +
-			"\"return_type\": {\"name\": \"int\"}, \"outputs\": [\"result\"], " +
-			"\"output_specs\": []}," +
+			"\"return_type\": {\"name\": \"int\"}, \"outputs\": " +
+			"[{\"name\": \"result\", \"type\": {\"name\": \"int\"}}]}," +
 			"{\"name\": \"b:b\", \"module\": \"b\"}," +
 			"{\"name\": \"c:c\", \"module\": \"c\", \"function\": \"c\", " +
 			"\"env\": \"minimal\", \"form\": \"function\", \"params\": [], " +
-			"\"return_type\": {\"name\": \"int\"}, \"outputs\": [\"result\"], " +
-			"\"output_specs\": []}]}"), "description");
+			"\"return_type\": {\"name\": \"int\"}, \"outputs\": " +
+			"[{\"name\": \"result\", \"type\": {\"name\": \"int\"}}]}]}"), "description");
 
 		Description described = Description.fromJson(data);
 
@@ -353,14 +353,14 @@ public class WireTest {
 			"\"mapping\": [1, 2], \"select\": [], \"iterate\": [0], " +
 			"\"passed\": [], \"transpose\": [0, 1, 2], " +
 			"\"output_axes\": [\"z\", \"y\", \"x\"], \"calls\": 3, " +
-			"\"lossless\": true, \"warnings\": [], " +
+			"\"uses_all_data\": true, \"warnings\": [], " +
 			"\"summary\": \"run 3 times, once per z position\"}"), "plan"));
 
 		assertEquals("image", plan.param());
 		assertArrayEquals(new Integer[] { 1, 2 }, plan.mapping());
 		assertArrayEquals(new int[] { 0 }, plan.iterate());
 		assertEquals(3, plan.calls());
-		assertTrue(plan.lossless());
+		assertTrue(plan.usesAllData());
 		assertTrue(plan.warnings().isEmpty());
 	}
 
@@ -373,7 +373,7 @@ public class WireTest {
 			"\"mapping\": [0, 1, null], \"select\": [], \"iterate\": [], " +
 			"\"passed\": [], \"transpose\": [0, 1], " +
 			"\"output_axes\": [\"y\", \"x\"], \"calls\": 1, " +
-			"\"lossless\": true, \"warnings\": [], \"summary\": \"as is\"}"),
+			"\"uses_all_data\": true, \"warnings\": [], \"summary\": \"as is\"}"),
 			"plan"));
 		assertNull(plan.mapping()[2]);
 	}
@@ -385,13 +385,13 @@ public class WireTest {
 			"\"mapping\": [1, 2], \"select\": [[0, 4]], \"iterate\": [], " +
 			"\"passed\": [], \"transpose\": [0, 1], " +
 			"\"output_axes\": [\"y\", \"x\"], \"calls\": 1, " +
-			"\"lossless\": false, \"warnings\": [\"y is being fed the z axis\"], " +
+			"\"uses_all_data\": false, \"warnings\": [\"y is being fed the z axis\"], " +
 			"\"summary\": \"run at z=4, discarding the rest\", " +
 			"\"something_new\": 7}";
 		AdaptationPlan plan =
 			AdaptationPlan.fromJson(Wire.asMap(Json.parseJson(json), "plan"));
 
-		assertFalse(plan.lossless());
+		assertFalse(plan.usesAllData());
 		assertEquals(Collections.singletonList("y is being fed the z axis"),
 			plan.warnings());
 		assertArrayEquals(new int[] { 0, 4 }, plan.select()[0]);

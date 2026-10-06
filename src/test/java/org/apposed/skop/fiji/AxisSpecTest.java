@@ -94,7 +94,7 @@ public class AxisSpecTest {
 			"\"input_axes\": [\"z\", \"y\", \"x\"], \"mapping\": [1, 2], " +
 			"\"select\": [], \"iterate\": [0], \"passed\": [], " +
 			"\"transpose\": [0, 1, 2], \"output_axes\": [\"z\", \"y\", \"x\"], " +
-			"\"calls\": 3, \"lossless\": true, \"warnings\": [], " +
+			"\"calls\": 3, \"uses_all_data\": true, \"warnings\": [], " +
 			"\"summary\": \"\"}");
 
 		assertEquals("x y z!", AxisSpec.format(p, axes("y", "x")));
@@ -106,7 +106,7 @@ public class AxisSpecTest {
 			"\"input_axes\": [\"z\", \"y\", \"x\"], \"mapping\": [1, 2], " +
 			"\"select\": [[0, 27]], \"iterate\": [], \"passed\": [], " +
 			"\"transpose\": [0, 1], \"output_axes\": [\"y\", \"x\"], " +
-			"\"calls\": 1, \"lossless\": false, \"warnings\": [], " +
+			"\"calls\": 1, \"uses_all_data\": false, \"warnings\": [], " +
 			"\"summary\": \"\"}");
 
 		assertEquals("x y z=27", AxisSpec.format(p, axes("y", "x")));
@@ -118,7 +118,7 @@ public class AxisSpecTest {
 			"\"input_axes\": [\"z\", \"y\", \"x\"], \"mapping\": [], " +
 			"\"select\": [], \"iterate\": [], \"passed\": [0, 1, 2], " +
 			"\"transpose\": [0, 1, 2], \"output_axes\": [\"z\", \"y\", \"x\"], " +
-			"\"calls\": 1, \"lossless\": true, \"warnings\": [], " +
+			"\"calls\": 1, \"uses_all_data\": true, \"warnings\": [], " +
 			"\"summary\": \"\"}");
 
 		assertEquals("x+ y+ z+", AxisSpec.format(p, variadic()));
@@ -132,7 +132,7 @@ public class AxisSpecTest {
 			"\"mapping\": [1, 4, 3], \"select\": [[2, 27]], \"iterate\": [0], " +
 			"\"passed\": [], \"transpose\": [0, 1, 2, 3], " +
 			"\"output_axes\": [\"t\", \"c\", \"y\", \"x\"], \"calls\": 5, " +
-			"\"lossless\": false, \"warnings\": [], \"summary\": \"\"}");
+			"\"uses_all_data\": false, \"warnings\": [], \"summary\": \"\"}");
 
 		assertEquals("x y z=27 c t!", AxisSpec.format(p, axes("c?", "x", "y")));
 	}
@@ -145,7 +145,7 @@ public class AxisSpecTest {
 			"\"input_axes\": [\"\", \"\", \"\"], \"mapping\": [1, 2], " +
 			"\"select\": [], \"iterate\": [0], \"passed\": [], " +
 			"\"transpose\": [0, 1, 2], \"output_axes\": [\"\", \"\", \"\"], " +
-			"\"calls\": 3, \"lossless\": true, \"warnings\": [], " +
+			"\"calls\": 3, \"uses_all_data\": true, \"warnings\": [], " +
 			"\"summary\": \"\"}");
 
 		assertEquals("x y !", AxisSpec.format(p, axes("y", "x")));

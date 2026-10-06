@@ -104,6 +104,7 @@ public class RolesTest {
 		assertEquals(ImgLabeling.class, Roles.type(Role.LABELS));
 		assertEquals(ROITree.class, Roles.type(Role.MASKS));
 		assertEquals(ROITree.class, Roles.type(Role.POINTS));
+		assertEquals(ROITree.class, Roles.type(Role.BOXES));
 		assertEquals(ROITree.class, Roles.type(Role.SHAPES));
 		assertEquals(org.scijava.table.Table.class, Roles.type(Role.TRACKS));
 	}
@@ -262,10 +263,13 @@ public class RolesTest {
 
 	@Test
 	public void testRoisArriveAsATree() {
-		ROITree tree = Rois.toRois(table(new double[][] { { 0, 0, 2, 2 } }),
-			Role.SHAPES);
-		assertEquals(1, Rois.flatten(tree).size());
-		assertTrue(Rois.flatten(tree).get(0) instanceof Box);
+		// shapes is read as boxes too, until a freeform reader exists.
+		for (Role role : new Role[] { Role.BOXES, Role.SHAPES }) {
+			ROITree tree = Rois.toRois(table(new double[][] { { 0, 0, 2, 2 } }),
+				role);
+			assertEquals(1, Rois.flatten(tree).size());
+			assertTrue(Rois.flatten(tree).get(0) instanceof Box);
+		}
 	}
 
 	@Test

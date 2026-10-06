@@ -59,7 +59,8 @@ import org.scijava.table.Table;
  *   <tr><td>{@code labels}</td><td>{@link ImgLabeling}</td><td></td></tr>
  *   <tr><td>{@code masks}</td><td>{@link ROITree}</td><td>one ROI per mask, overlapping allowed</td></tr>
  *   <tr><td>{@code points}</td><td>{@link ROITree}</td><td>of point masks</td></tr>
- *   <tr><td>{@code shapes}</td><td>{@link ROITree}</td><td>of boxes</td></tr>
+ *   <tr><td>{@code boxes}</td><td>{@link ROITree}</td><td>of boxes</td></tr>
+ *   <tr><td>{@code shapes}</td><td>{@link ROITree}</td><td>read as boxes, until a freeform reader exists</td></tr>
  *   <tr><td>{@code tracks}</td><td>{@link Table}</td><td>a TrackMate model later</td></tr>
  *   <tr><td>{@code vectors}</td><td>{@link Dataset}</td><td>still owed an Overlay of arrows</td></tr>
  *   <tr><td>{@code surface}</td><td>{@link Dataset}</td><td>still owed a mesh</td></tr>
@@ -102,6 +103,7 @@ public final class Roles {
 		switch (role) {
 			case LABELS:
 				return ImgLabeling.class;
+			case BOXES:
 			case MASKS:
 			case POINTS:
 			case SHAPES:
@@ -118,7 +120,8 @@ public final class Roles {
 
 	/** Whether values of this role become ROIs. */
 	public static boolean isRoi(Role role) {
-		return role == Role.MASKS || role == Role.POINTS || role == Role.SHAPES;
+		return role == Role.BOXES || role == Role.MASKS || role == Role.POINTS ||
+			role == Role.SHAPES;
 	}
 
 	/**
