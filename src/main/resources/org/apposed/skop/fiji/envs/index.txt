@@ -1,0 +1,9 @@
+cellpose3
+cupy
+minimal
+pytorch
+sdeconv
+segment-everything
+skimage
+stardist-tf
+unseg-cv

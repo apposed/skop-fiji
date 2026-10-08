@@ -161,7 +161,11 @@ public class SkopRunner implements Closeable {
 
 	// -- configuration ---------------------------------------------------
 
-	/** The directory prepended to every worker's search path. */
+	/**
+	 * The directory prepended to every worker's search path, or null when
+	 * there is no checkout and workers import the scikit-ops their
+	 * environment pins.
+	 */
 	public File root() {
 		return root;
 	}
@@ -549,7 +553,8 @@ public class SkopRunner implements Closeable {
 		if (cached != null) return cached;
 
 		Service service = environment(METADATA_ENV, null).python();
-		service.init(String.format(BOOTSTRAP, pythonString(root.getAbsolutePath())));
+		service.init(root == null ? withoutRoot(BOOTSTRAP) :
+			String.format(BOOTSTRAP, pythonString(root.getAbsolutePath())));
 		if (debug) service.debug(line -> System.out.println("[metadata] " + line));
 		service.start();
 		services.put(METADATA_ENV + "/metadata", service);
@@ -585,8 +590,8 @@ public class SkopRunner implements Closeable {
 		constants();
 		// skop's INIT is a Python format template with a {root!r} field; the
 		// !r is a repr, which for a path string is a quoted Python literal.
-		String script = initScript.replace("{root!r}",
-			pythonString(root.getAbsolutePath()));
+		String script = root == null ? withoutRoot(initScript) : initScript.replace(
+			"{root!r}", pythonString(root.getAbsolutePath()));
 		File extra = new File(new File(envsDir, envId), "init.py");
 		if (extra.exists()) {
 			script = script + "\n" + new String(
@@ -594,6 +599,20 @@ public class SkopRunner implements Closeable {
 				java.nio.charset.StandardCharsets.UTF_8);
 		}
 		return script;
+	}
+
+	/**
+	 * A script with its {@code sys.path} insert taken out, for a runner with no
+	 * checkout: the worker then imports the scikit-ops its environment pins.
+	 */
+	private static String withoutRoot(String script) {
+		String out = script.replaceAll("(?m)^sys\\.path\\.insert\\(0, (%s|\\{root!r\\})\\)\\n", "");
+		if (out.contains("{root!r}") || out.contains("%s")) {
+			throw new IllegalStateException("Cannot run without a checkout: this " +
+				"skop's worker script puts its root on sys.path somewhere other " +
+				"than its own line.");
+		}
+		return out;
 	}
 
 	/**
@@ -660,6 +679,15 @@ public class SkopRunner implements Closeable {
 			result.put(String.valueOf(entry.getKey()), entry.getValue());
 		}
 		return result;
+	}
+
+	/**
+	 * A runner over the environment recipes this plugin carries, with no
+	 * checkout: each worker imports the scikit-ops its recipe pins. See
+	 * {@link BundledEnvs}.
+	 */
+	public static SkopRunner bundled() throws IOException {
+		return new SkopRunner(null, BundledEnvs.unpack());
 	}
 
 	/**

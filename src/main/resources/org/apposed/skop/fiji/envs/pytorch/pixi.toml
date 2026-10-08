@@ -1,0 +1,88 @@
+[workspace]
+name = "skop-pytorch"
+description = "The shared PyTorch environment: well-maintained torch libraries that can coexist."
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "linux-64", "win-64"]
+version = "0.1.0"
+
+# This environment is meant to hold several ops, not one. Torch installs are
+# large and slow, so anything torch-based that solves cleanly alongside what is
+# already here belongs here rather than in an environment of its own.
+#
+# Three occupants now: ultralytics for the FastSAM detector, micro_sam for the
+# mask detector of docs/design/0008, and Cellpose, whose own environment this
+# replaced -- which is why envs/cellpose is gone.
+#
+# Conda-forge alone until Cellpose 4.2, which it does not carry; see
+# [pypi-dependencies].
+#
+# envs/cellpose3 stays separate, and is the exception that shows the rule:
+# Cellpose 4 replaced the v3 model zoo and moved the API with it, so the two
+# cannot share an environment at any version pin.
+
+[system-requirements]
+cuda = "12.0"
+
+[dependencies]
+python = "3.11.*"
+numpy = "*"
+ultralytics = ">=8.3"
+# NB: appose is not listed as a conda dependency here, unlike in
+# envs/unseg-cv, and this is temporary. A conda appose does satisfy the
+# pinned scikit-ops' PyPI dependency on it -- but only once the pin is new
+# enough to have dropped scikit-ops' [tool.uv.sources] git source for
+# appose, which uv honors transitively and which makes the solve
+# unsatisfiable. So this goes back to `appose = ">=0.12"` above as soon as
+# the rev below is bumped past that change and conda-forge carries 0.12.
+
+# NB: micro_sam depends on `napari >=0.5,<0.6` and `pyqt` outright -- it ships
+# a napari plugin and does not split it out. So this environment installs a GUI
+# stack that nothing in it imports; the ops use micro_sam.util and
+# micro_sam.prompt_based_segmentation, neither of which touches napari. Heavy
+# but harmless: a worker process never opens a window, and 0002's whole point
+# is that this napari pin cannot reach the front end's.
+#
+# It also carries `zarr <3` and `xarray <2025.3` -- worth knowing when the next
+# occupant fails to solve.
+micro_sam = ">=1.6"
+
+# NB: torchvision is required explicitly even though nothing here imports it
+# directly. conda's ultralytics does not depend on it, but reads
+# `importlib.metadata.version("torchvision")` at import time and raises
+# PackageNotFoundError when it is absent -- so leaving it out fails at the
+# first `from ultralytics import ...`, not at some later feature.
+torchvision = "*"
+
+# PyTorch varies by platform: CUDA builds where there are GPUs to use,
+# and the plain package on Apple Silicon, where MPS comes built in.
+
+[pypi-dependencies]
+# Conda-forge stops at cellpose 4.1.1, and 4.2 is where the DINO models
+# arrived; dinov3 is only on GitHub. Neither pulls a second torch -- pixi maps
+# the conda pytorch onto the `torch` requirement.
+cellpose = ">=4.2"
+dinov3 = { git = "https://github.com/facebookresearch/dinov3" }
+
+# InstanSeg is plain torch, PyPI only. Since 0.1 its file readers (bioio,
+# rasterio, slideio) are an optional `io` extra, left out: the op is handed
+# an array. The base install is torch, numpy, scikit-image and small helpers.
+instanseg-torch = "*"
+
+# Note: pinned deliberately -- this is part of the environment's identity,
+# so bumping it rebuilds every environment. A checkout still shadows it,
+# because skop.host.INIT puts src at sys.path[0]. See
+# docs/spec/fiji-front-end.md; it becomes an ordinary version constraint
+# once scikit-ops is released.
+scikit-ops = { git = "https://github.com/apposed/scikit-ops.git", rev = "00925fea3d92f3c974b7b1ec67d6633307d27bcc" }
+
+[target.linux-64.dependencies]
+pytorch-gpu = "*"
+cudnn = "*"
+cuda-version = "12.2"
+
+[target.win-64.dependencies]
+pytorch-gpu = "*"
+cudnn = "*"
+
+[target.osx-arm64.dependencies]
+pytorch = "*"

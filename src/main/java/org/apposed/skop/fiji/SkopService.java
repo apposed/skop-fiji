@@ -99,7 +99,7 @@ public class SkopService extends AbstractService implements SciJavaService {
 		// starts discovery and returns; the menu fills in when it finishes.
 		if (Boolean.getBoolean("skop.noAutoDiscover")) return;
 		if (!available()) {
-			log.debug("scikit-ops: no checkout found; no ops registered.");
+			log.debug("scikit-ops: no checkout and no carried recipes; no ops registered.");
 			return;
 		}
 		discover();
@@ -110,16 +110,32 @@ public class SkopService extends AbstractService implements SciJavaService {
 	/**
 	 * The runner every op goes through.
 	 *
-	 * @return the runner, built over whatever checkout was found.
-	 * @throws IllegalStateException if there is no scikit-ops checkout.
+	 * A checkout, when one is named ({@code SKOP_CHECKOUT}, or
+	 * {@code -Dskop.checkout}): its code runs, edits and all. Otherwise the
+	 * environment recipes this plugin carries, whose pinned scikit-ops runs.
+	 *
+	 * @return the runner.
+	 * @throws IllegalStateException if there is no checkout and the carried
+	 *           recipes cannot be unpacked.
 	 */
 	public synchronized SkopRunner runner() {
 		if (runner == null) {
 			runner = SkopRunner.fromCheckout();
-			if (runner == null) {
-				throw new IllegalStateException(
-					"No scikit-ops checkout found. Set -Dskop.checkout=<path>, or " +
-						"$SKOP_CHECKOUT, or put one beside this project.");
+			if (runner != null) {
+				log.info("scikit-ops: running the checkout at " +
+					runner.root().getParentFile());
+			}
+			else {
+				try {
+					runner = SkopRunner.bundled();
+				}
+				catch (IOException exc) {
+					throw new IllegalStateException("No scikit-ops checkout, and the " +
+						"environment recipes this plugin carries could not be unpacked",
+						exc);
+				}
+				log.info("scikit-ops: running the version its environments pin; " +
+					"recipes in " + runner.envsDir());
 			}
 			runner.subscribeBuild(new BuildTasks());
 			runner.subscribeBuildProgress(this::reportBuild);
@@ -133,9 +149,18 @@ public class SkopService extends AbstractService implements SciJavaService {
 		return tasks;
 	}
 
-	/** Whether a checkout was found, without demanding one. */
+	/**
+	 * Whether there is anything to run: a checkout, or the recipes this
+	 * plugin carries.
+	 */
 	public synchronized boolean available() {
-		return runner != null || SkopRunner.fromCheckout() != null;
+		if (runner != null || SkopRunner.fromCheckout() != null) return true;
+		try {
+			return !BundledEnvs.ids().isEmpty();
+		}
+		catch (IOException exc) {
+			return false;
+		}
 	}
 
 	/** The ops found so far, or an empty list if discovery has not finished. */
@@ -366,6 +391,9 @@ public class SkopService extends AbstractService implements SciJavaService {
 	}
 
 	private String treeHash() {
+		// With no checkout, the ops are whatever the recipes pin, and the
+		// unpacked directory's name is already a hash of the recipes.
+		if (runner().root() == null) return runner().envsDir().getName();
 		StringBuilder sb = new StringBuilder();
 		File root = new File(runner().root(), "skop");
 		collect(root, sb);

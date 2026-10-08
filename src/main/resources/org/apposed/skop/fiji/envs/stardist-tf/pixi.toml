@@ -1,0 +1,91 @@
+[workspace]
+name = "skop-stardist-tf"
+description = "StarDist on TensorFlow, in 2D and 3D."
+channels = ["conda-forge"]
+platforms = ["osx-arm64", "osx-64", "linux-64", "win-64"]
+version = "0.1.0"
+
+# Shared by ops/stardist2d.py and ops/starfun3d.py: same stack, one build.
+#
+# The per-platform TensorFlow split is inherited from starfun3d, where it is
+# known to work. TF 2.10 is the last release with GPU support on Windows, and
+# Apple Silicon needs the tensorflow-macos/tensorflow-metal pair rather than
+# plain tensorflow.
+
+[dependencies]
+python = "==3.10"
+numpy = "<2"
+scipy = "*"
+pip = "*"
+# NB: appose is not listed as a conda dependency here, unlike in
+# envs/unseg-cv, and this is temporary. A conda appose does satisfy the
+# pinned scikit-ops' PyPI dependency on it -- but only once the pin is new
+# enough to have dropped scikit-ops' [tool.uv.sources] git source for
+# appose, which uv honors transitively and which makes the solve
+# unsatisfiable. So this goes back to `appose = ">=0.12"` above as soon as
+# the rev below is bumped past that change and conda-forge carries 0.12.
+# NB: stardist 0.9.1 imports pkg_resources, which setuptools dropped in 81.
+setuptools = "<81"
+
+[pypi-dependencies]
+# Note: pinned deliberately -- this is part of the environment's identity,
+# so bumping it rebuilds every environment. A checkout still shadows it,
+# because skop.host.INIT puts src at sys.path[0]. See
+# docs/spec/fiji-front-end.md; it becomes an ordinary version constraint
+# once scikit-ops is released.
+scikit-ops = { git = "https://github.com/apposed/scikit-ops.git", rev = "00925fea3d92f3c974b7b1ec67d6633307d27bcc" }
+stardist = "==0.9.1"
+csbdeep = "*"
+
+[target.osx-64.dependencies]
+python = "==3.10"
+
+[target.osx-arm64.dependencies]
+# NB: inherited from starfun3d, which leaves Python unpinned here so the
+# resolver can pick whatever tensorflow-macos currently ships wheels for.
+# In practice that means Apple Silicon runs a newer Python than the other
+# platforms -- 3.12 with TF 2.16, rather than 3.10 with TF 2.10.
+python = "*"
+
+# CUDA on Windows only. TF 2.10 predates the CUDA-carrying wheels and ships no
+# CUDA of its own, so on win-64 it has to come from conda. Nothing else is
+# needed: pixi's activation already puts %CONDA_PREFIX%\Library\bin on PATH,
+# which is how Windows finds DLLs.
+#
+# Linux needs none of this: tensorflow[and-cuda] below brings its own CUDA in
+# site-packages, where TensorFlow finds it without help. macOS has no CUDA at
+# all; Apple Silicon uses tensorflow-metal.
+[target.win-64.dependencies]
+cudatoolkit = "11.2.*"
+cudnn = "8.1.*"
+
+[target.win-64.pypi-dependencies]
+tensorflow = "==2.10.1"
+
+# 2.15 is the ceiling, not a preference: 2.16 defaults to Keras 3, which
+# csbdeep and stardist 0.9.1 do not work with. The [and-cuda] extra pulls
+# NVIDIA's own pip wheels, so this is the whole CUDA story on Linux.
+[target.linux-64.pypi-dependencies]
+tensorflow = { version = "==2.15.*", extras = ["and-cuda"] }
+
+[target.osx-64.pypi-dependencies]
+tensorflow = "*"
+
+[target.osx-arm64.pypi-dependencies]
+tensorflow-macos = "*"
+tensorflow-metal = "*"
+
+# Variant: Apple Silicon without the Metal plugin, which some models trip over.
+[feature.nometal]
+channels = ["conda-forge"]
+
+[feature.nometal.target.osx-arm64.pypi-dependencies]
+tensorflow = "*"
+
+# NB: Only 'default' is installed on build; 'nometal' is materialized on
+# demand via Runner.run(..., variant="nometal"). There is no longer a 'cuda'
+# variant -- CUDA rides with the wheel on Linux and comes from conda on
+# Windows, both in the default.
+[environments]
+default = { solve-group = "default" }
+nometal = { features = ["nometal"], solve-group = "default" }
