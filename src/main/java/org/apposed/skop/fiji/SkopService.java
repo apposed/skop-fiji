@@ -138,6 +138,10 @@ public class SkopService extends AbstractService implements SciJavaService {
 					"recipes in " + runner.envsDir());
 			}
 			runner.subscribeBuild(new BuildTasks());
+			runner.subscribeWorkers((op, env) -> log.info("scikit-ops: " +
+				shortName(op) + " runs in the " + env + " environment; starting " +
+				"its worker. It stays running for this Fiji session, so later runs " +
+				"start faster."));
 			runner.subscribeBuildProgress(this::reportBuild);
 			runner.subscribeBuildError(chunk -> log.debug(chunk.trim()));
 		}
@@ -356,6 +360,15 @@ public class SkopService extends AbstractService implements SciJavaService {
 		org.scijava.task.Task> building =
 			new java.util.concurrent.atomic.AtomicReference<>();
 
+	/** An op's short name, as scripts and the panel know it: segment.cellpose4. */
+	private static String shortName(String opName) {
+		String prefix = "skop.ops.";
+		int colon = opName.indexOf(':');
+		if (!opName.startsWith(prefix) || colon < 0) return opName;
+		String namespace = opName.substring(prefix.length(), colon).split("\\.")[0];
+		return namespace + "." + opName.substring(colon + 1);
+	}
+
 	/** When each environment's preparation began, for saying how long it took. */
 	private final Map<String, Long> buildStarts =
 		new java.util.concurrent.ConcurrentHashMap<>();
@@ -372,8 +385,14 @@ public class SkopService extends AbstractService implements SciJavaService {
 			// "ready in 2 s" versus "ready in 140 s" afterwards says which.
 			buildStarts.put(envId, System.currentTimeMillis());
 			lastBuildTitle = null;
-			log.info("scikit-ops: preparing the " + envId + " environment" +
-				" (the first time, this downloads and can take minutes)");
+			if (runner.isBuilt(envId)) {
+				log.info("scikit-ops: using the " + envId + " environment, " +
+					"built earlier");
+			}
+			else {
+				log.info("scikit-ops: building the " + envId + " environment; " +
+					"the first time, this downloads and can take minutes");
+			}
 			if (tasks == null) return;
 			org.scijava.task.Task task =
 				tasks.createTask("Building scikit-ops environment: " + envId);
@@ -388,8 +407,12 @@ public class SkopService extends AbstractService implements SciJavaService {
 			long seconds = start == null ? 0 :
 				(System.currentTimeMillis() - start + 500) / 1000;
 			if (error == null) {
-				log.info("scikit-ops: the " + envId + " environment is ready, after " +
-					seconds + " s");
+				// Said only after a real build: a check of a built environment
+				// has already been announced, and "ready after 0 s" is noise.
+				if (seconds > 2) {
+					log.info("scikit-ops: the " + envId + " environment is ready, " +
+						"after " + seconds + " s");
+				}
 			}
 			else {
 				log.info("scikit-ops: preparing the " + envId + " environment " +

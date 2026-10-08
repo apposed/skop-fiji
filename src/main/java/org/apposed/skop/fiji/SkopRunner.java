@@ -31,6 +31,8 @@ package org.apposed.skop.fiji;
 import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -39,6 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import org.apposed.appose.Appose;
@@ -50,6 +53,7 @@ import org.apposed.appose.Service;
 import org.apposed.appose.TaskException;
 import org.apposed.appose.TaskEvent;
 import org.apposed.appose.builder.PixiBuilder;
+import org.apposed.appose.util.Environments;
 import org.apposed.appose.util.Json;
 import org.apposed.skop.fiji.wire.AdaptationPlan;
 import org.apposed.skop.fiji.wire.Description;
@@ -131,6 +135,8 @@ public class SkopRunner implements Closeable {
 	private final List<Consumer<String>> buildOutput = new ArrayList<>();
 	private final List<Consumer<String>> buildError = new ArrayList<>();
 	private final List<BuildListener> buildListeners = new ArrayList<>();
+	private final List<BiConsumer<String, String>> workerListeners =
+		new ArrayList<>();
 
 	private boolean debug;
 	private Map<String, Object> constants;
@@ -242,6 +248,40 @@ public class SkopRunner implements Closeable {
 	}
 
 	// -- environments ----------------------------------------------------
+
+	/**
+	 * Hears when a worker is started, as (op, environment): once per
+	 * environment per session, since a worker is kept for later runs.
+	 */
+	public SkopRunner subscribeWorkers(BiConsumer<String, String> listener) {
+		workerListeners.add(listener);
+		return this;
+	}
+
+	/**
+	 * Whether an environment is already built from its current recipe, so
+	 * that preparing it is a check rather than a download.
+	 * <p>
+	 * Appose keeps a copy of the pixi.toml it built from beside the
+	 * environment; the same text means the same environment. This is what
+	 * skop's own runner compares, and a guess only in that Appose decides in
+	 * the end: a false "not built" costs a misleading message, nothing more.
+	 */
+	public boolean isBuilt(String envId) {
+		File dir = new File(Environments.apposeEnvsDir(), "skop-" + envId);
+		File built = new File(dir, "pixi.toml");
+		if (!built.isFile() || !new File(dir, ".pixi").isDirectory()) return false;
+		try {
+			String was = new String(Files.readAllBytes(built.toPath()),
+				StandardCharsets.UTF_8);
+			String is = new String(Files.readAllBytes(envConfig(envId).toPath()),
+				StandardCharsets.UTF_8);
+			return was.trim().equals(is.trim());
+		}
+		catch (IOException | IllegalArgumentException exc) {
+			return false;
+		}
+	}
 
 	/** The pixi.toml defining an environment. */
 	public File envConfig(String envId) {
@@ -518,6 +558,9 @@ public class SkopRunner implements Closeable {
 		if (cached != null) return cached;
 
 		Service service = environment(op.env(), variant).python();
+		for (BiConsumer<String, String> listener : workerListeners) {
+			listener.accept(op.name(), op.env());
+		}
 		service.init(initScript(op.env()));
 		if (debug) service.debug(line -> System.out.println("[" + op.env() + "] " + line));
 		service.start();
