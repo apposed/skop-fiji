@@ -317,8 +317,12 @@ public class SkopService extends AbstractService implements SciJavaService {
 	private void reportBuild(String title, long current, long maximum) {
 		// A first run of a TensorFlow or PyTorch environment is minutes long,
 		// and unlike a napari user launched from a terminal, a Fiji user has
-		// nowhere else to look.
-		log.info("scikit-ops: " + title);
+		// nowhere else to look. Once per phase: progress within one arrives
+		// many times a second.
+		if (!title.equals(lastBuildTitle)) {
+			lastBuildTitle = title;
+			log.info("scikit-ops:   " + title);
+		}
 		org.scijava.task.Task task = building.get();
 		if (task != null) {
 			task.setStatusMessage(title);
@@ -352,10 +356,24 @@ public class SkopService extends AbstractService implements SciJavaService {
 		org.scijava.task.Task> building =
 			new java.util.concurrent.atomic.AtomicReference<>();
 
+	/** When each environment's preparation began, for saying how long it took. */
+	private final Map<String, Long> buildStarts =
+		new java.util.concurrent.ConcurrentHashMap<>();
+
+	/** The build phase last logged, so each is logged once. */
+	private volatile String lastBuildTitle;
+
 	private class BuildTasks implements SkopRunner.BuildListener {
 
 		@Override
 		public void started(String envId) {
+			// Said for every first use in a session, because only pixi knows
+			// whether this is a quick check or a download of gigabytes -- and
+			// "ready in 2 s" versus "ready in 140 s" afterwards says which.
+			buildStarts.put(envId, System.currentTimeMillis());
+			lastBuildTitle = null;
+			log.info("scikit-ops: preparing the " + envId + " environment" +
+				" (the first time, this downloads and can take minutes)");
 			if (tasks == null) return;
 			org.scijava.task.Task task =
 				tasks.createTask("Building scikit-ops environment: " + envId);
@@ -366,6 +384,17 @@ public class SkopService extends AbstractService implements SciJavaService {
 
 		@Override
 		public void finished(String envId, Exception error) {
+			Long start = buildStarts.remove(envId);
+			long seconds = start == null ? 0 :
+				(System.currentTimeMillis() - start + 500) / 1000;
+			if (error == null) {
+				log.info("scikit-ops: the " + envId + " environment is ready, after " +
+					seconds + " s");
+			}
+			else {
+				log.info("scikit-ops: preparing the " + envId + " environment " +
+					"failed after " + seconds + " s: " + error.getMessage());
+			}
 			org.scijava.task.Task task = building.getAndSet(null);
 			if (task == null) return;
 			if (error != null) task.setStatusMessage("Failed: " + error.getMessage());
