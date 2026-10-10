@@ -110,10 +110,10 @@ public class SkopRunner implements Closeable {
 	private static final String BOOTSTRAP =
 		"import sys\n" +
 		"sys.path.insert(0, %s)\n" +
-		"import skop.host\n" +
-		"skop_describe = skop.host.describe\n" +
-		"skop_plan = skop.host.plan\n" +
-		"skop_constants = skop.host.constants\n";
+		"import oprunner.host\n" +
+		"skop_describe = oprunner.host.describe\n" +
+		"skop_plan = oprunner.host.plan\n" +
+		"skop_constants = oprunner.host.constants\n";
 
 	/** The environment the metadata service runs in. */
 	private static final String METADATA_ENV = "minimal";
@@ -127,6 +127,7 @@ public class SkopRunner implements Closeable {
 	public static final String OPS_PACKAGE = "skop.ops";
 
 	private final File root;
+	private final File opsRoot;
 	private final File envsDir;
 
 	private final Map<String, Environment> envs = new ConcurrentHashMap<>();
@@ -147,10 +148,12 @@ public class SkopRunner implements Closeable {
 	 * Creates a runner over a scikit-ops checkout.
 	 *
 	 * @param checkout the scikit-ops checkout: the directory holding
-	 *          {@code src} and {@code envs}.
+	 *          {@code oprunner/src} (the runner), {@code src} (the ops) and
+	 *          {@code envs}.
 	 */
 	public SkopRunner(File checkout) {
-		this(new File(checkout, "src"), new File(checkout, "envs"));
+		this(new File(new File(checkout, "oprunner"), "src"),
+			new File(checkout, "src"), new File(checkout, "envs"));
 	}
 
 	/**
@@ -161,7 +164,23 @@ public class SkopRunner implements Closeable {
 	 * @param envsDir the directory holding {@code <env-id>/pixi.toml}.
 	 */
 	public SkopRunner(File root, File envsDir) {
+		this(root, null, envsDir);
+	}
+
+	/**
+	 * Creates a runner over explicit sources for the runner and the ops.
+	 *
+	 * @param root the directory holding the {@code oprunner} package,
+	 *          prepended to every worker's {@code sys.path}.
+	 * @param opsRoot the directory holding the {@code skop} package, the ops:
+	 *          sent with every call as the op's {@code origin}, so a worker
+	 *          imports the ops from there. Null for the ops an environment
+	 *          installs.
+	 * @param envsDir the directory holding {@code <env-id>/pixi.toml}.
+	 */
+	public SkopRunner(File root, File opsRoot, File envsDir) {
 		this.root = root;
+		this.opsRoot = opsRoot;
 		this.envsDir = envsDir;
 	}
 
@@ -174,6 +193,14 @@ public class SkopRunner implements Closeable {
 	 */
 	public File root() {
 		return root;
+	}
+
+	/**
+	 * The directory holding the ops ({@code skop}), or null when workers
+	 * import the ops their environment installs.
+	 */
+	public File opsRoot() {
+		return opsRoot;
 	}
 
 	/** The directory the environment definitions are read from. */
@@ -536,9 +563,10 @@ public class SkopRunner implements Closeable {
 		inputs.put("function", op.function());
 		inputs.put("kwargs", new LinkedHashMap<>(args));
 		inputs.put("plans", planJson);
-		// Where the host found the op, for one outside any installed package.
-		// Fiji only runs installed ops, so none: the worker imports by name.
-		inputs.put("origin", null);
+		// Where the worker imports the op from: a checkout's ops, or, with
+		// none, whatever the op's environment installs.
+		inputs.put("origin", opsRoot == null ? null :
+			Collections.singletonMap("root", opsRoot.getAbsolutePath()));
 
 		Service service = service(op, variant);
 		Service.Task task = service.task(call(), inputs,
@@ -607,8 +635,12 @@ public class SkopRunner implements Closeable {
 		if (cached != null) return cached;
 
 		Service service = environment(METADATA_ENV, null).python();
-		service.init(root == null ? withoutRoot(BOOTSTRAP) :
-			String.format(BOOTSTRAP, pythonString(root.getAbsolutePath())));
+		String bootstrap = root == null ? withoutRoot(BOOTSTRAP) :
+			String.format(BOOTSTRAP, pythonString(root.getAbsolutePath()));
+		// describe imports the ops, so they go on the path too.
+		if (opsRoot != null) bootstrap = "import sys\nsys.path.insert(0, " +
+			pythonString(opsRoot.getAbsolutePath()) + ")\n" + bootstrap;
+		service.init(bootstrap);
 		if (debug) service.debug(line -> System.out.println("[metadata] " + line));
 		service.start();
 		services.put(METADATA_ENV + "/metadata", service);

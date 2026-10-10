@@ -123,7 +123,7 @@ public class SkopService extends AbstractService implements SciJavaService {
 			runner = SkopRunner.fromCheckout();
 			if (runner != null) {
 				log.info("scikit-ops: running the checkout at " +
-					runner.root().getParentFile());
+					runner.opsRoot().getParentFile());
 			}
 			else {
 				try {
@@ -447,7 +447,7 @@ public class SkopService extends AbstractService implements SciJavaService {
 		// unpacked directory's name is already a hash of the recipes.
 		if (runner().root() == null) return runner().envsDir().getName();
 		StringBuilder sb = new StringBuilder();
-		File root = new File(runner().root(), "skop");
+		File root = new File(runner().opsRoot(), "skop");
 		collect(root, sb);
 		try {
 			MessageDigest digest = MessageDigest.getInstance("SHA-1");

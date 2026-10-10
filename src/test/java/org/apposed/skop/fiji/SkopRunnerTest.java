@@ -145,7 +145,7 @@ public class SkopRunnerTest {
 		Map<String, Object> constants = runner.constants();
 		assertEquals("skop_invoke(task, module, function, kwargs, plans, origin)",
 			constants.get("call"));
-		assertTrue(((String) constants.get("init")).contains("skop.worker"));
+		assertTrue(((String) constants.get("init")).contains("oprunner.worker"));
 		// And they are fetched once.
 		assertSame(constants, runner.constants());
 	}
