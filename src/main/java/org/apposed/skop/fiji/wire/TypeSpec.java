@@ -52,7 +52,7 @@ import java.util.Map;
  */
 public class TypeSpec {
 
-	/** The vocabulary itself. Kept in step with {@code skop._spec.WIRE_TYPES}. */
+	/** The vocabulary itself. Kept in step with {@code opspec.op.WIRE_TYPES}. */
 	public enum Kind {
 		INT("int"),
 		FLOAT("float"),
