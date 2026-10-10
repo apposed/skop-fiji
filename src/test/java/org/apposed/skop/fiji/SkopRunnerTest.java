@@ -143,7 +143,7 @@ public class SkopRunnerTest {
 	@Test
 	public void testConstantsComeFromSkopRatherThanFromHere() throws Exception {
 		Map<String, Object> constants = runner.constants();
-		assertEquals("skop_invoke(task, module, function, kwargs, plans)",
+		assertEquals("skop_invoke(task, module, function, kwargs, plans, origin)",
 			constants.get("call"));
 		assertTrue(((String) constants.get("init")).contains("skop.worker"));
 		// And they are fetched once.

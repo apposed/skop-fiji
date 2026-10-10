@@ -536,6 +536,9 @@ public class SkopRunner implements Closeable {
 		inputs.put("function", op.function());
 		inputs.put("kwargs", new LinkedHashMap<>(args));
 		inputs.put("plans", planJson);
+		// Where the host found the op, for one outside any installed package.
+		// Fiji only runs installed ops, so none: the worker imports by name.
+		inputs.put("origin", null);
 
 		Service service = service(op, variant);
 		Service.Task task = service.task(call(), inputs,
