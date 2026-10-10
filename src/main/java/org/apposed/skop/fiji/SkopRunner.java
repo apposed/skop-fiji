@@ -268,7 +268,7 @@ public class SkopRunner implements Closeable {
 	 * the end: a false "not built" costs a misleading message, nothing more.
 	 */
 	public boolean isBuilt(String envId) {
-		File dir = new File(Environments.apposeEnvsDir(), "skop-" + envId);
+		File dir = new File(Environments.apposeEnvsDir(), builtName(envId));
 		File built = new File(dir, "pixi.toml");
 		if (!built.isFile() || !new File(dir, ".pixi").isDirectory()) return false;
 		try {
@@ -343,8 +343,16 @@ public class SkopRunner implements Closeable {
 		}
 	}
 
+	/**
+	 * What an environment is built as: {@code scikit-ops--<id>}, the name
+	 * scikit-ops' own runner gives it, so Fiji and Python share one build.
+	 */
+	private static String builtName(String envId) {
+		return "scikit-ops--" + envId;
+	}
+
 	private Environment build(String envId, String variant) throws BuildException {
-		PixiBuilder builder = Appose.pixi(envConfig(envId)).name("skop-" + envId);
+		PixiBuilder builder = Appose.pixi(envConfig(envId)).name(builtName(envId));
 		for (Builder.ProgressConsumer subscriber : buildProgress) {
 			builder = builder.subscribeProgress(subscriber);
 		}
